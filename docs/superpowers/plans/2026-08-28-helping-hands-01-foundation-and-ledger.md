@@ -1008,6 +1008,7 @@ const TABLES = [
   "Contributor",
   "Session",
   "Account",
+  "VerificationToken",
   "User",
   "ReceiptCounter",
   "OrgSettings",
@@ -1477,8 +1478,11 @@ export async function requireAdminOrRedirect(): Promise<SessionUser> {
 }
 ```
 
-`redirect()` throws a control-flow signal that Next.js handles, so it must sit
-outside the `try` block that swallows errors — hence the shape above.
+`redirect()` works by throwing a `NEXT_REDIRECT` signal that Next.js catches
+higher up. Calling it inside the `catch` is correct here: the `catch` handles
+the error `requireUser` threw, and the redirect signal thrown afterwards escapes
+uncaught. Never call `redirect()` inside a `try` whose `catch` swallows
+everything — that would trap the signal and silently render nothing.
 
 - [ ] **Step 6: Guard the member area**
 
@@ -2314,7 +2318,7 @@ git commit -m "feat: add contributor and contribution data layer with audit and 
 
 **Files:**
 - Create: `src/components/ui/Button.tsx`, `src/components/ui/Field.tsx`, `src/components/ui/AmountInput.tsx`, `src/components/ui/Money.tsx`, `src/components/RecordList.tsx`, `src/components/AdminShell.tsx`, `src/app/admin/layout.tsx`
-- Modify: `src/app/globals.css`, `src/app/layout.tsx`
+- Modify: `src/app/layout.tsx`
 - Test: `tests/lib/money-display.test.ts`
 
 **Interfaces:**
