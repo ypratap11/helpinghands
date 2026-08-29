@@ -1,0 +1,8 @@
+# These run inside Linux containers (or are Linux shell scripts run
+# directly on the Ubuntu droplet) - force LF regardless of the checkout
+# platform's core.autocrlf setting, so a Windows clone can never
+# reintroduce CRLF into a file bash/sh has to execute.
+*.sh text eol=lf
+Dockerfile text eol=lf
+docker/entrypoint.sh text eol=lf
+Caddyfile text eol=lf
