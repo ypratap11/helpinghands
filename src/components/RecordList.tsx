@@ -27,7 +27,7 @@ export function RecordList<T extends { id: string }>({
         ))}
       </ul>
 
-      <div className="hidden overflow-hidden rounded-lg border border-neutral-200 bg-white sm:block">
+      <div className="hidden overflow-x-auto rounded-lg border border-neutral-200 bg-white sm:block">
         <table className="w-full text-left text-sm">
           <thead className="border-b border-neutral-200 bg-neutral-50">
             <tr>
