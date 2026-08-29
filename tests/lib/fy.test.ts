@@ -4,6 +4,7 @@ import {
   financialYearOf,
   financialYearRange,
   toDateOnly,
+  todayInIndia,
 } from "@/lib/fy";
 
 describe("financialYearOf", () => {
@@ -63,5 +64,29 @@ describe("toDateOnly", () => {
     expect(toDateOnly(new Date("2026-08-28T18:00:00Z")).toISOString().slice(0, 10)).toBe(
       "2026-08-28",
     );
+  });
+});
+
+describe("todayInIndia", () => {
+  it("returns a YYYY-MM-DD string", () => {
+    const result = todayInIndia(new Date("2026-08-28T12:00:00Z"));
+    expect(result).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it("converts UTC midnight-crossing to the next Indian day", () => {
+    // 19:00 UTC is 00:30 IST the next day — this breaks with toISOString().slice(0, 10)
+    expect(todayInIndia(new Date("2026-08-28T19:00:00Z"))).toBe("2026-08-29");
+    // Show why the helper exists:
+    expect(new Date("2026-08-28T19:00:00Z").toISOString().slice(0, 10)).toBe("2026-08-28");
+  });
+
+  it("keeps the same Indian day until 05:30 UTC (23:59 IST)", () => {
+    // 18:29 UTC is 23:59 IST — still the same day
+    expect(todayInIndia(new Date("2026-08-28T18:29:00Z"))).toBe("2026-08-28");
+  });
+
+  it("defaults to the current time when called with no argument", () => {
+    const result = todayInIndia();
+    expect(result).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 });

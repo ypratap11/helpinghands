@@ -36,3 +36,14 @@ export function financialYearRange(fy: string): { start: Date; end: Date } {
 export function currentFinancialYear(now: Date = new Date()): string {
   return financialYearOf(now);
 }
+
+/**
+ * Today's calendar date in Asia/Kolkata as "YYYY-MM-DD".
+ *
+ * Not the same as toDateOnly(new Date()): the server runs UTC and users are in
+ * India (UTC+5:30), so between 00:00 and 05:30 IST a UTC-derived date is a day
+ * behind. Any "default to today" must use this.
+ */
+export function todayInIndia(now: Date = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(now);
+}
