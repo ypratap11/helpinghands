@@ -1,0 +1,64 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: helping
+      POSTGRES_DB: helping_hands
+      # POSTGRES_PASSWORD comes from .env.production, never hardcoded here.
+    env_file:
+      - .env.production
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U helping -d helping_hands"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    # Deliberately no `ports:` - Postgres is reachable only from other
+    # containers on this compose network (i.e. the `app` service), never
+    # from the host or the internet.
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env.production
+    expose:
+      - "3000"
+    healthcheck:
+      # Deliberately hits "/" rather than an /api/auth/* route: Auth.js
+      # rejects requests whose Host header doesn't match NEXTAUTH_URL, and
+      # a healthcheck run from inside the container against 127.0.0.1 will
+      # always send Host: 127.0.0.1:3000, which will never match. "/" isn't
+      # a NextAuth route, so it isn't subject to that check.
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    # No published host port either - only Caddy talks to `app`, over the
+    # compose network, on its internal port 3000.
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  dbdata:
+  caddy_data:
+  caddy_config:
