@@ -3378,7 +3378,9 @@ export default async function ContributionsPage() {
               ) : (
                 <form action={voidContributionAction}>
                   <input type="hidden" name="id" value={c.id} />
-                  <button className="text-xs text-neutral-500 underline">Void</button>
+                  <button className="inline-flex min-h-[44px] items-center px-2 text-xs text-neutral-500 underline">
+                    Void
+                  </button>
                 </form>
               ),
           },
@@ -3394,6 +3396,15 @@ export default async function ContributionsPage() {
               {c.status === "VOID" ? " · Voided" : ""}
             </span>
             <span className="text-xs text-neutral-400">{c.receiptNo ?? ""}</span>
+
+            {c.status === "ACTIVE" ? (
+              <form action={voidContributionAction} className="pt-1">
+                <input type="hidden" name="id" value={c.id} />
+                <button className="inline-flex min-h-[44px] items-center text-sm text-neutral-500 underline">
+                  Void this entry
+                </button>
+              </form>
+            ) : null}
           </div>
         )}
       />
