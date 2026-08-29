@@ -6,7 +6,24 @@
 
 **Architecture:** One Next.js App Router application backed by PostgreSQL through Prisma. Pure logic (money, financial years, receipt numbering) lives in `src/lib/*` as framework-free modules that are unit-tested directly. All database reads and writes go through a data-access layer in `src/lib/data/*`, so authorization filters live in one place instead of being retyped on every page. Postgres runs in Docker locally and on the droplet, so development and production share one database engine.
 
-**Tech Stack:** Next.js 15 (App Router, TypeScript), React 19, Tailwind CSS v4, Prisma 6, PostgreSQL 16, Auth.js v5 (`next-auth@beta`) with the Prisma adapter and Google provider, Vitest for tests, Docker Compose.
+**Tech Stack:** Next.js (App Router, TypeScript), React, Tailwind CSS v4, Prisma, PostgreSQL 16, Auth.js v5 (`next-auth@beta`) with the Prisma adapter and Google provider, Vitest for tests, Docker Compose.
+
+**Versions actually installed** (resolved during Task 1 — these supersede any version named elsewhere in this plan):
+
+| Package | Installed |
+|---|---|
+| next | 16.3.3 |
+| react | 19.2.8 |
+| prisma / @prisma/client | 7.10.0 |
+| zod | 4.5.2 |
+| vitest | 4.1.11 |
+| tailwindcss | 4.x |
+
+The plan text was drafted against Next 15 / Prisma 6 / Zod 3. Where a task's code
+conflicts with the installed major version, **the installed version wins** — adapt
+the code and say so in your report. Known deltas to watch: Prisma 7 changed the
+client generator contract (Task 4), and Zod 4 prefers `z.email()` over the
+deprecated `z.string().email()` (Task 10).
 
 **Spec:** `docs/superpowers/specs/2026-08-28-helping-hands-design.md`
 
@@ -410,6 +427,15 @@ git commit -m "feat: add integer-paise money parsing and en-IN formatting"
   - `financialYearRange(fy: string): { start: Date; end: Date }`
   - `currentFinancialYear(now?: Date): string`
   - `toDateOnly(input: Date | string): Date` — a UTC-midnight `Date` safe for a Postgres `DATE` column
+  - `todayInIndia(now?: Date): string` — today's calendar date in `Asia/Kolkata` as `"YYYY-MM-DD"`
+
+**Why `todayInIndia` exists.** `toDateOnly` truncates whatever instant it is given;
+it does not convert zones. The production droplet runs UTC while users are in
+India (UTC+5:30), so `new Date().toISOString().slice(0, 10)` returns *yesterday*
+between 00:00 and 05:30 IST. Any code defaulting a date field to "today" must use
+`todayInIndia()`, never `toISOString()` — otherwise a contribution entered just
+after midnight is filed to the previous day, which is exactly the drift the spec's
+date-only rule exists to prevent.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -562,9 +588,76 @@ git commit -m "feat: add Indian financial-year helpers"
 
 The full model is written now, including tables used only in plans 2 and 3, so there is one migration baseline rather than a schema that churns.
 
+> **Prisma 7 deltas — verified empirically during Task 1, not assumed.** This
+> project runs Prisma 7.10.0, and three things differ from Prisma 6. They are
+> already reflected in the steps below; do not "correct" them back.
+>
+> 1. **`url` is forbidden in the `datasource` block.** Leaving it there is a hard
+>    `P1012` validation error, not a warning. The connection URL moves to a new
+>    `prisma.config.ts` at the project root (Step 0 below).
+> 2. **`new PrismaClient()` with no arguments throws at runtime** — it now
+>    requires a driver adapter. `src/lib/db.ts` must pass `@prisma/adapter-pg`
+>    (Step 0 below).
+> 3. **`prisma migrate dev` no longer auto-runs `generate` or the seed.** Run
+>    `prisma generate` and `prisma db seed` as explicit separate commands, and
+>    configure the seed in `prisma.config.ts` — the `"prisma": { "seed": ... }`
+>    block in `package.json` is silently ignored in Prisma 7.
+>
+> What did NOT change, despite expectations: the `prisma-client-js` generator
+> still works and still generates into `node_modules/@prisma/client`, the
+> `import { PrismaClient } from "@prisma/client"` import path is unchanged, and
+> `@db.Date` is still correct for a date-only column.
+
+- [ ] **Step 0: Add the Prisma 7 configuration and driver adapter**
+
+Install the dependencies Prisma 7 requires:
+
+```bash
+npm install @prisma/adapter-pg pg dotenv
+npm install -D @types/pg
+```
+
+Create `prisma.config.ts` at the project root, beside `package.json`. The
+`dotenv/config` import must be the first line — `prisma/config`'s `env()` helper
+gives type safety but does not load `.env` files by itself, and without it the
+CLI silently sees no `DATABASE_URL`.
+
+```ts
+import "dotenv/config";
+import { defineConfig, env } from "prisma/config";
+
+export default defineConfig({
+  schema: "prisma/schema.prisma",
+  migrations: {
+    path: "prisma/migrations",
+    seed: "tsx prisma/seed.ts",
+  },
+  datasource: {
+    url: env("DATABASE_URL"),
+  },
+});
+```
+
+Update `src/lib/db.ts` to construct the client with a driver adapter. Task 1
+created this file with a bare `new PrismaClient()`, which throws on Prisma 7:
+
+```ts
+import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
+
+const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
+
+const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
+
+export const prisma = globalForPrisma.prisma ?? new PrismaClient({ adapter });
+
+if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+```
+
 - [ ] **Step 1: Write the schema**
 
-Create `prisma/schema.prisma`:
+Create `prisma/schema.prisma`. Note the `datasource` block carries only
+`provider` — the URL lives in `prisma.config.ts`:
 
 ```prisma
 generator client {
@@ -573,7 +666,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 enum Role {
@@ -863,25 +955,31 @@ main()
   });
 ```
 
-Add to `package.json`:
-
-```json
-"prisma": { "seed": "tsx prisma/seed.ts" },
-```
-
-and to scripts:
+Add to `package.json` scripts. Do **not** add a top-level `"prisma": { "seed": ... }`
+block — Prisma 7 ignores it; the seed command already lives in `prisma.config.ts`
+from Step 0.
 
 ```json
 "db:seed": "tsx prisma/seed.ts",
 "db:migrate": "prisma migrate dev",
+"db:generate": "prisma generate",
 "db:reset": "prisma migrate reset --force"
 ```
 
-- [ ] **Step 4: Run the seed**
+- [ ] **Step 4: Generate the client, then run the seed**
+
+Prisma 7's `migrate dev` no longer generates the client or runs the seed for you,
+so both are explicit:
 
 ```bash
+npm run db:generate
 npm run db:seed
 ```
+
+Generating the client also fixes the `TS2305: Module '"@prisma/client"' has no
+exported member 'PrismaClient'` error that `npm run build` has been failing with
+since Task 1 — that error is simply the client not existing yet. Confirm with
+`npm run build` before you commit.
 
 Expected: exits 0. Run it a second time — it must also exit 0, proving idempotence.
 
@@ -1008,6 +1106,7 @@ const TABLES = [
   "Contributor",
   "Session",
   "Account",
+  "VerificationToken",
   "User",
   "ReceiptCounter",
   "OrgSettings",
@@ -1087,8 +1186,35 @@ git commit -m "test: isolate tests in a dedicated database with per-test reset"
 ### Task 6: Google sign-in with role bootstrap and contributor linking
 
 **Files:**
-- Create: `src/lib/auth.ts`, `src/app/api/auth/[...nextauth]/route.ts`, `src/app/login/page.tsx`
+- Create: `src/lib/auth-roles.ts`, `src/lib/auth.ts`, `src/app/api/auth/[...nextauth]/route.ts`, `src/app/login/page.tsx`
+- Modify: `vitest.config.mts`
 - Test: `tests/lib/auth-bootstrap.test.ts`
+
+> **Next 16 / Auth.js ESM incompatibility — discovered during implementation.**
+> `next@16.3.3` ships no `package.json#exports` field, so `next-auth`'s internal
+> extensionless `import ... from "next/server"` cannot resolve under strict ESM.
+> Turbopack's resolver tolerates this, so `next dev` works fine; Node's and
+> Vitest's do not, so any test that transitively imports `next-auth` crashes at
+> module load before a single assertion runs. Two changes address it, and both
+> stand on their own merits:
+>
+> 1. **Pure logic lives in `src/lib/auth-roles.ts`, which never imports
+>    `next-auth`.** `resolveRoleForEmail` and `linkContributorToUser` depend only
+>    on Prisma and types. `src/lib/auth.ts` imports them and does the framework
+>    wiring. This matches how `money.ts` and `fy.ts` are already framework-free,
+>    and it means the logic is testable without booting an auth framework.
+> 2. **`vitest.config.mts` sets `server.deps.inline` for `next-auth`.** This is
+>    the load-bearing setting: inlining routes the import through Vite's resolver
+>    rather than Node's strict ESM resolver, which is what actually resolves the
+>    extensionless specifier. Later tasks need this too — Task 7's guards and
+>    Tasks 12–13's server actions all transitively reach these modules.
+>
+>    An `alias` for `next/server` and `next/cache` was tried first and **proved
+>    inert** — verified by disabling it and watching the suite stay green, then
+>    disabling `deps.inline` instead and watching the original failure return. The
+>    alias is kept as defence in depth but is not what fixes this. `tests/lib/auth-wiring.test.ts`
+>    is the standing proof that `@/lib/auth` loads under Vitest at all; do not
+>    delete it as redundant.
 
 **Interfaces:**
 - Consumes: `prisma` from `src/lib/db.ts`
@@ -1267,10 +1393,14 @@ Expected: PASS, all tests.
 
 - [ ] **Step 6: Wire the route handler and login page**
 
-Create `src/app/api/auth/[...nextauth]/route.ts`:
+Create `src/app/api/auth/[...nextauth]/route.ts`. Note that `src/lib/auth.ts`
+exports `handlers` — an object holding the two route functions — not `GET` and
+`POST` directly, so they must be destructured out of it:
 
 ```ts
-export { GET, POST } from "@/lib/auth";
+import { handlers } from "@/lib/auth";
+
+export const { GET, POST } = handlers;
 ```
 
 Create `src/app/login/page.tsx`:
@@ -1477,8 +1607,11 @@ export async function requireAdminOrRedirect(): Promise<SessionUser> {
 }
 ```
 
-`redirect()` throws a control-flow signal that Next.js handles, so it must sit
-outside the `try` block that swallows errors — hence the shape above.
+`redirect()` works by throwing a `NEXT_REDIRECT` signal that Next.js catches
+higher up. Calling it inside the `catch` is correct here: the `catch` handles
+the error `requireUser` threw, and the redirect signal thrown afterwards escapes
+uncaught. Never call `redirect()` inside a `try` whose `catch` swallows
+everything — that would trap the signal and silently render nothing.
 
 - [ ] **Step 6: Guard the member area**
 
@@ -2314,7 +2447,7 @@ git commit -m "feat: add contributor and contribution data layer with audit and 
 
 **Files:**
 - Create: `src/components/ui/Button.tsx`, `src/components/ui/Field.tsx`, `src/components/ui/AmountInput.tsx`, `src/components/ui/Money.tsx`, `src/components/RecordList.tsx`, `src/components/AdminShell.tsx`, `src/app/admin/layout.tsx`
-- Modify: `src/app/globals.css`, `src/app/layout.tsx`
+- Modify: `src/app/layout.tsx`
 - Test: `tests/lib/money-display.test.ts`
 
 **Interfaces:**
@@ -2511,7 +2644,7 @@ export function RecordList<T extends { id: string }>({
         ))}
       </ul>
 
-      <div className="hidden overflow-hidden rounded-lg border border-neutral-200 bg-white sm:block">
+      <div className="hidden overflow-x-auto rounded-lg border border-neutral-200 bg-white sm:block">
         <table className="w-full text-left text-sm">
           <thead className="border-b border-neutral-200 bg-neutral-50">
             <tr>
@@ -3204,6 +3337,7 @@ import { RecordList } from "@/components/RecordList";
 import { Money } from "@/components/ui/Money";
 import { listContributions } from "@/lib/data/contributions";
 import { listContributors } from "@/lib/data/contributors";
+import { todayInIndia } from "@/lib/fy";
 import { ContributionForm } from "./ContributionForm";
 import { voidContributionAction } from "./actions";
 
@@ -3216,7 +3350,7 @@ export default async function ContributionsPage() {
     listContributions(),
     listContributors(),
   ]);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInIndia();
 
   return (
     <div className="flex flex-col gap-6">
@@ -3244,7 +3378,9 @@ export default async function ContributionsPage() {
               ) : (
                 <form action={voidContributionAction}>
                   <input type="hidden" name="id" value={c.id} />
-                  <button className="text-xs text-neutral-500 underline">Void</button>
+                  <button className="inline-flex min-h-[44px] items-center px-2 text-xs text-neutral-500 underline">
+                    Void
+                  </button>
                 </form>
               ),
           },
@@ -3260,6 +3396,15 @@ export default async function ContributionsPage() {
               {c.status === "VOID" ? " · Voided" : ""}
             </span>
             <span className="text-xs text-neutral-400">{c.receiptNo ?? ""}</span>
+
+            {c.status === "ACTIVE" ? (
+              <form action={voidContributionAction} className="pt-1">
+                <input type="hidden" name="id" value={c.id} />
+                <button className="inline-flex min-h-[44px] items-center text-sm text-neutral-500 underline">
+                  Void this entry
+                </button>
+              </form>
+            ) : null}
           </div>
         )}
       />

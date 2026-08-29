@@ -284,6 +284,28 @@ Playwright for the flows that matter end to end:
 
 ## 11. Deployment and operations
 
+**Target host:** DigitalOcean droplet at `146.190.39.48`, currently unused and
+dedicated to this project.
+
+**Hostname:** `helpinghands.augaster.com`, an A record pointing at the droplet,
+managed in Cloudflare. A bare IP was ruled out: Google rejects IP addresses as
+OAuth redirect URIs (only real domains, plus `localhost`), and Let's Encrypt will
+not issue a certificate for one, so HTTPS would be impossible and session cookies
+carrying admin logins would cross the network in clear text.
+
+**The Cloudflare record must be DNS-only (grey cloud), not proxied.** With
+proxying on, Caddy cannot complete an ACME challenge — TLS-ALPN-01 fails behind
+the proxy outright, and HTTP-01 generally fails because Cloudflare terminates TLS
+itself. Cloudflare's default Flexible SSL mode compounds this: it speaks plain
+HTTP to the origin while Caddy redirects HTTP to HTTPS, producing a redirect
+loop. If proxying is wanted later — it hides the origin IP and absorbs DDoS
+traffic — the supported path is a Cloudflare Origin Certificate installed in
+Caddy with SSL mode set to Full (strict).
+
+**Google OAuth redirect URIs:** `http://localhost:3000/api/auth/callback/google`
+for development and `https://helpinghands.augaster.com/api/auth/callback/google`
+for production, both registered on the same OAuth client.
+
 - `docker-compose.yml` runs app + db + caddy; the same file works locally and on the droplet
 - Secrets via `.env` (never committed); `.env.example` documents every variable:
   `DATABASE_URL`, `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`,
