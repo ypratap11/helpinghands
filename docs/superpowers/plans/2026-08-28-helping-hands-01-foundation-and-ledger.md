@@ -427,6 +427,15 @@ git commit -m "feat: add integer-paise money parsing and en-IN formatting"
   - `financialYearRange(fy: string): { start: Date; end: Date }`
   - `currentFinancialYear(now?: Date): string`
   - `toDateOnly(input: Date | string): Date` — a UTC-midnight `Date` safe for a Postgres `DATE` column
+  - `todayInIndia(now?: Date): string` — today's calendar date in `Asia/Kolkata` as `"YYYY-MM-DD"`
+
+**Why `todayInIndia` exists.** `toDateOnly` truncates whatever instant it is given;
+it does not convert zones. The production droplet runs UTC while users are in
+India (UTC+5:30), so `new Date().toISOString().slice(0, 10)` returns *yesterday*
+between 00:00 and 05:30 IST. Any code defaulting a date field to "today" must use
+`todayInIndia()`, never `toISOString()` — otherwise a contribution entered just
+after midnight is filed to the previous day, which is exactly the drift the spec's
+date-only rule exists to prevent.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -3297,6 +3306,7 @@ import { RecordList } from "@/components/RecordList";
 import { Money } from "@/components/ui/Money";
 import { listContributions } from "@/lib/data/contributions";
 import { listContributors } from "@/lib/data/contributors";
+import { todayInIndia } from "@/lib/fy";
 import { ContributionForm } from "./ContributionForm";
 import { voidContributionAction } from "./actions";
 
@@ -3309,7 +3319,7 @@ export default async function ContributionsPage() {
     listContributions(),
     listContributors(),
   ]);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInIndia();
 
   return (
     <div className="flex flex-col gap-6">
