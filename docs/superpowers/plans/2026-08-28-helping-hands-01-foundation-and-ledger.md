@@ -1186,8 +1186,27 @@ git commit -m "test: isolate tests in a dedicated database with per-test reset"
 ### Task 6: Google sign-in with role bootstrap and contributor linking
 
 **Files:**
-- Create: `src/lib/auth.ts`, `src/app/api/auth/[...nextauth]/route.ts`, `src/app/login/page.tsx`
+- Create: `src/lib/auth-roles.ts`, `src/lib/auth.ts`, `src/app/api/auth/[...nextauth]/route.ts`, `src/app/login/page.tsx`
+- Modify: `vitest.config.mts`
 - Test: `tests/lib/auth-bootstrap.test.ts`
+
+> **Next 16 / Auth.js ESM incompatibility — discovered during implementation.**
+> `next@16.3.3` ships no `package.json#exports` field, so `next-auth`'s internal
+> extensionless `import ... from "next/server"` cannot resolve under strict ESM.
+> Turbopack's resolver tolerates this, so `next dev` works fine; Node's and
+> Vitest's do not, so any test that transitively imports `next-auth` crashes at
+> module load before a single assertion runs. Two changes address it, and both
+> stand on their own merits:
+>
+> 1. **Pure logic lives in `src/lib/auth-roles.ts`, which never imports
+>    `next-auth`.** `resolveRoleForEmail` and `linkContributorToUser` depend only
+>    on Prisma and types. `src/lib/auth.ts` imports them and does the framework
+>    wiring. This matches how `money.ts` and `fy.ts` are already framework-free,
+>    and it means the logic is testable without booting an auth framework.
+> 2. **`vitest.config.mts` aliases `next/server` and `next/cache`** to the real
+>    files in `node_modules/next/`, which exist and load correctly — only the
+>    extensionless specifier is unresolvable. Later tasks need this too: Task 7's
+>    guards and Tasks 12–13's server actions all transitively reach these modules.
 
 **Interfaces:**
 - Consumes: `prisma` from `src/lib/db.ts`
