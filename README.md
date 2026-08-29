@@ -1,36 +1,93 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Helping Hands
 
-## Getting Started
+A contribution tracker for a small charity group in India: who gave what, who
+it went to, and a running balance — with an eye toward 80G tax receipts once
+the group registers as a trust/society.
 
-First, run the development server:
+See `docs/superpowers/specs/2026-08-28-helping-hands-design.md` for the full
+design.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Local setup
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Prerequisites: Node.js, Docker Desktop (must be running — Postgres runs in a
+container), and a Google Cloud OAuth client.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. **Start Postgres.**
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+   ```bash
+   docker compose up -d db
+   ```
 
-## Learn More
+   This starts a Postgres container on port 5433 with a `helping_hands`
+   database already created. Create the test database used by the test
+   suite as well:
 
-To learn more about Next.js, take a look at the following resources:
+   ```bash
+   docker compose exec db psql -U helping -c "CREATE DATABASE helping_hands_test;"
+   ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+2. **Configure environment variables.**
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+   ```bash
+   cp .env.example .env
+   ```
 
-## Deploy on Vercel
+   Fill in:
+   - `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` — from a Google Cloud OAuth
+     client (OAuth consent screen + Web application credentials). Add
+     `http://localhost:3000/api/auth/callback/google` as an authorized
+     redirect URI.
+   - `ADMIN_EMAILS` — a comma-separated list of Google account emails that
+     should sign in as admins.
+   - `AUTH_SECRET` — generate one with:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+     ```bash
+     npx auth secret
+     ```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+   `DATABASE_URL` and the other defaults in `.env.example` already match the
+   `docker-compose.yml` setup and don't need to change for local dev.
+
+3. **Set up the database.**
+
+   ```bash
+   npm install
+   npm run db:migrate
+   npm run db:generate
+   npm run db:seed
+   ```
+
+4. **Set up the test database.** Create `.env.test` alongside `.env`, pointed
+   at `helping_hands_test` instead of `helping_hands` (see the commented-out
+   line in `.env.example`), then run:
+
+   ```bash
+   npm run db:test:migrate
+   ```
+
+   The test suite refuses to run unless `.env.test` resolves to a database
+   whose name contains `helping_hands_test` — every test run truncates all
+   tables.
+
+5. **Run it.**
+
+   ```bash
+   npm run dev
+   ```
+
+   Open [http://localhost:3000](http://localhost:3000). Sign in with a
+   Google account listed in `ADMIN_EMAILS` to reach `/admin`.
+
+6. **Run the tests.**
+
+   ```bash
+   npm test
+   ```
+
+## Other scripts
+
+- `npm run build` / `npm start` — production build and start
+- `npm run lint` — ESLint
+- `npx tsc --noEmit` — type-check
+- `npm run db:reset` — drop and recreate the dev database from migrations
+  (destructive, dev database only)
