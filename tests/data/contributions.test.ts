@@ -147,6 +147,29 @@ describe("voidContribution", () => {
     expect(totals.collectedPaise).toBe(100000n);
     expect(keep.status).toBe("ACTIVE");
   });
+
+  it("writes a VOID audit row with the actor id", async () => {
+    const actor = await prisma.user.create({ data: { email: "boss@example.com" } });
+    const contributor = await aContributor();
+    const created = await createContribution(
+      {
+        contributorId: contributor.id,
+        amountPaise: 100000,
+        receivedOn: new Date(Date.UTC(2026, 7, 28)),
+        mode: "CASH",
+      },
+      actor.id,
+    );
+
+    await voidContribution(created.id, actor.id);
+
+    const audit = await prisma.auditLog.findFirst({
+      where: { entityType: "Contribution", entityId: created.id, action: "VOID" },
+    });
+    expect(audit).not.toBeNull();
+    expect(audit?.userId).toBe(actor.id);
+    expect((audit?.after as { status: string }).status).toBe("VOID");
+  });
 });
 
 describe("listContributions", () => {

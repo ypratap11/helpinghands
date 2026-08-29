@@ -1,11 +1,10 @@
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
+import { ANONYMOUS_CONTRIBUTOR_ID } from "@/lib/data/contributors";
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
 const prisma = new PrismaClient({ adapter });
-
-export const ANONYMOUS_CONTRIBUTOR_ID = "anonymous";
 
 async function main() {
   await prisma.orgSettings.upsert({

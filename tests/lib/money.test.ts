@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  AmountTooLargeError,
   InvalidAmountError,
+  MAX_AMOUNT_PAISE,
   formatPaise,
   formatPaiseCompact,
   parseRupeesToPaise,
@@ -48,6 +50,14 @@ describe("parseRupeesToPaise", () => {
   it("rejects empty and non-numeric input", () => {
     expect(() => parseRupeesToPaise("")).toThrow(InvalidAmountError);
     expect(() => parseRupeesToPaise("abc")).toThrow(InvalidAmountError);
+  });
+
+  it("accepts an amount exactly at the INT4 ceiling", () => {
+    expect(parseRupeesToPaise("21474836.47")).toBe(MAX_AMOUNT_PAISE);
+  });
+
+  it("rejects an amount above the INT4 column ceiling with a friendly error", () => {
+    expect(() => parseRupeesToPaise("21474836.48")).toThrow(AmountTooLargeError);
   });
 });
 

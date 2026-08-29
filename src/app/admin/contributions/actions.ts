@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/authz";
 import { createContribution, voidContribution } from "@/lib/data/contributions";
 import { toDateOnly } from "@/lib/fy";
-import { InvalidAmountError, parseRupeesToPaise } from "@/lib/money";
+import { AmountTooLargeError, InvalidAmountError, parseRupeesToPaise } from "@/lib/money";
 
 export type ActionState = { error?: string; ok?: boolean };
 
@@ -28,6 +28,11 @@ export async function addContributionAction(
   const receivedOnRaw = String(data.get("receivedOn") ?? "").trim();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(receivedOnRaw)) return { error: "Enter the date received." };
 
+  const receivedOnDate = toDateOnly(receivedOnRaw);
+  if (receivedOnDate.toISOString().slice(0, 10) !== receivedOnRaw) {
+    return { error: "Enter a real date." };
+  }
+
   const modeRaw = String(data.get("mode") ?? "");
   const mode = (MODES as readonly string[]).includes(modeRaw) ? (modeRaw as Mode) : null;
   if (!mode) return { error: "Choose how the money was received." };
@@ -36,6 +41,9 @@ export async function addContributionAction(
   try {
     amountPaise = parseRupeesToPaise(String(data.get("amount") ?? ""));
   } catch (error) {
+    if (error instanceof AmountTooLargeError) {
+      return { error: "That amount is too large to record. Please double-check it." };
+    }
     if (error instanceof InvalidAmountError) return { error: "Enter a valid amount, such as 2500." };
     throw error;
   }
@@ -45,7 +53,7 @@ export async function addContributionAction(
       {
         contributorId,
         amountPaise,
-        receivedOn: toDateOnly(receivedOnRaw),
+        receivedOn: receivedOnDate,
         mode,
         reference: (String(data.get("reference") ?? "").trim() || null) as string | null,
         note: (String(data.get("note") ?? "").trim() || null) as string | null,
@@ -62,7 +70,13 @@ export async function addContributionAction(
 }
 
 export async function voidContributionAction(data: FormData): Promise<void> {
-  const actor = await requireAdmin();
+  let actor;
+  try {
+    actor = await requireAdmin();
+  } catch {
+    return;
+  }
+
   const id = String(data.get("id") ?? "");
   if (id) await voidContribution(id, actor.id);
   revalidatePath("/admin/contributions");

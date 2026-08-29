@@ -9,7 +9,9 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 const { prisma } = await import("@/lib/db");
 const { ForbiddenError } = await import("@/lib/authz");
-const { addContributionAction } = await import("@/app/admin/contributions/actions");
+const { addContributionAction, voidContributionAction } = await import(
+  "@/app/admin/contributions/actions"
+);
 
 function form(fields: Record<string, string>) {
   const data = new FormData();
@@ -85,5 +87,87 @@ describe("addContributionAction", () => {
     );
 
     expect(result.error).toMatch(/date/i);
+  });
+
+  it("rejects a date whose components roll over into a different day, and writes nothing", async () => {
+    const contributor = await prisma.contributor.create({ data: { name: "Asha" } });
+
+    const result = await addContributionAction(
+      {},
+      form({ contributorId: contributor.id, amount: "100", receivedOn: "2026-13-40", mode: "CASH" }),
+    );
+
+    expect(result.error).toMatch(/date/i);
+    expect(await prisma.contribution.count()).toBe(0);
+  });
+
+  it("rejects an empty contributorId and writes nothing", async () => {
+    const result = await addContributionAction(
+      {},
+      form({ contributorId: "", amount: "100", receivedOn: "2026-08-28", mode: "CASH" }),
+    );
+
+    expect(result.error).toMatch(/who this came from/i);
+    expect(await prisma.contribution.count()).toBe(0);
+  });
+
+  it("returns a friendly error for an amount above the postgres INT4 ceiling and writes nothing", async () => {
+    const contributor = await prisma.contributor.create({ data: { name: "Asha" } });
+
+    const result = await addContributionAction(
+      {},
+      form({
+        contributorId: contributor.id,
+        amount: "21474836.48",
+        receivedOn: "2026-08-28",
+        mode: "CASH",
+      }),
+    );
+
+    expect(result.error).toBeTruthy();
+    expect(await prisma.contribution.count()).toBe(0);
+  });
+});
+
+describe("voidContributionAction", () => {
+  beforeEach(async () => {
+    requireAdminMock.mockReset();
+    requireAdminMock.mockResolvedValue({ id: "admin1", email: "boss@example.com", role: "ADMIN" });
+    await prisma.user.create({ data: { id: "admin1", email: "boss@example.com", role: "ADMIN" } });
+  });
+
+  it("voids the contribution for an admin", async () => {
+    const contributor = await prisma.contributor.create({ data: { name: "Asha" } });
+    const contribution = await prisma.contribution.create({
+      data: {
+        contributorId: contributor.id,
+        amountPaise: 1000,
+        receivedOn: new Date(Date.UTC(2026, 7, 28)),
+        mode: "CASH",
+      },
+    });
+
+    await voidContributionAction(form({ id: contribution.id }));
+
+    const after = await prisma.contribution.findUnique({ where: { id: contribution.id } });
+    expect(after?.status).toBe("VOID");
+  });
+
+  it("returns cleanly for a non-admin instead of throwing, and voids nothing", async () => {
+    requireAdminMock.mockRejectedValue(new ForbiddenError());
+    const contributor = await prisma.contributor.create({ data: { name: "Asha" } });
+    const contribution = await prisma.contribution.create({
+      data: {
+        contributorId: contributor.id,
+        amountPaise: 1000,
+        receivedOn: new Date(Date.UTC(2026, 7, 28)),
+        mode: "CASH",
+      },
+    });
+
+    await expect(voidContributionAction(form({ id: contribution.id }))).resolves.toBeUndefined();
+
+    const after = await prisma.contribution.findUnique({ where: { id: contribution.id } });
+    expect(after?.status).toBe("ACTIVE");
   });
 });

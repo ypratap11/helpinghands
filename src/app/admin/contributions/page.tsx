@@ -1,9 +1,10 @@
 import { RecordList } from "@/components/RecordList";
 import { Money } from "@/components/ui/Money";
 import { listContributions } from "@/lib/data/contributions";
-import { listContributors } from "@/lib/data/contributors";
+import { ANONYMOUS_CONTRIBUTOR_ID, listContributors } from "@/lib/data/contributors";
 import { todayInIndia } from "@/lib/fy";
 import { ContributionForm } from "./ContributionForm";
+import { VoidButton } from "./VoidButton";
 import { voidContributionAction } from "./actions";
 
 function formatDate(value: Date) {
@@ -23,7 +24,11 @@ export default async function ContributionsPage() {
 
       <section className="rounded-lg border border-neutral-200 bg-white p-4">
         <h2 className="pb-4 font-medium">Record a contribution</h2>
-        <ContributionForm contributors={contributors} today={today} />
+        <ContributionForm
+          contributors={contributors}
+          today={today}
+          anonymousContributorId={ANONYMOUS_CONTRIBUTOR_ID}
+        />
       </section>
 
       <RecordList
@@ -41,12 +46,7 @@ export default async function ContributionsPage() {
               c.status === "VOID" ? (
                 <span className="text-xs text-red-600">Voided</span>
               ) : (
-                <form action={voidContributionAction}>
-                  <input type="hidden" name="id" value={c.id} />
-                  <button className="inline-flex min-h-[44px] items-center px-2 text-xs text-neutral-500 underline">
-                    Void
-                  </button>
-                </form>
+                <VoidButton id={c.id} action={voidContributionAction} />
               ),
           },
         ]}
@@ -62,12 +62,14 @@ export default async function ContributionsPage() {
             </span>
             <span className="text-xs text-neutral-400">{c.receiptNo ?? ""}</span>
             {c.status === "ACTIVE" ? (
-              <form action={voidContributionAction} className="pt-1">
-                <input type="hidden" name="id" value={c.id} />
-                <button className="inline-flex min-h-[44px] items-center text-sm text-neutral-500 underline">
-                  Void this entry
-                </button>
-              </form>
+              <div className="pt-1">
+                <VoidButton
+                  id={c.id}
+                  action={voidContributionAction}
+                  label="Void this entry"
+                  className="inline-flex min-h-[44px] items-center text-sm text-neutral-500 underline"
+                />
+              </div>
             ) : null}
           </div>
         )}
