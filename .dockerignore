@@ -1,0 +1,25 @@
+# Never send real credentials into the build context / image layers.
+.env
+.env.*
+!.env.example
+!.env.production.example
+
+# Local-only / regenerated artifacts
+node_modules
+.next
+.git
+.superpowers
+coverage
+*.tsbuildinfo
+npm-debug.log*
+
+# Not needed inside the image
+docs
+backups
+storage
+README.md
+AGENTS.md
+CLAUDE.md
+docker-compose.yml
+docker-compose.prod.yml
+Caddyfile
