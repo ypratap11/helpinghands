@@ -284,6 +284,20 @@ Playwright for the flows that matter end to end:
 
 ## 11. Deployment and operations
 
+**Target host:** DigitalOcean droplet at `146.190.39.48`, currently unused and
+dedicated to this project.
+
+**A hostname is required — a bare IP will not do.** Google rejects IP addresses
+as OAuth redirect URIs (only real domains, plus `localhost`), and Let's Encrypt
+will not issue a certificate for a bare IP, so Caddy could not provide HTTPS.
+Without HTTPS, session cookies carrying admin logins would cross the network in
+clear text. Plan of record: deploy first on the free wildcard-DNS hostname
+`146-190-39-48.sslip.io`, which resolves to the droplet automatically and is
+accepted by both Let's Encrypt and Google; move to a purchased domain before the
+public transparency page is shared outside the group, since a throwaway hostname
+undercuts the trust that page exists to build. Switching is a DNS change plus one
+added redirect URI in Google — no code change.
+
 - `docker-compose.yml` runs app + db + caddy; the same file works locally and on the droplet
 - Secrets via `.env` (never committed); `.env.example` documents every variable:
   `DATABASE_URL`, `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`,
