@@ -3,6 +3,16 @@ import { prisma } from "@/lib/db";
 
 export const ANONYMOUS_CONTRIBUTOR_ID = "anonymous";
 
+// Belt-and-braces: refuse to operate on anything but the test database, even
+// if the vitest.config.mts guard was somehow bypassed. Runs once, at module
+// load, before any test's beforeEach (and thus before any TRUNCATE) can run.
+const databaseUrl = process.env.DATABASE_URL ?? "";
+if (!databaseUrl.includes("helping_hands_test")) {
+  throw new Error(
+    `Refusing to reset a non-test database. DATABASE_URL points at: ${databaseUrl || "(unset)"}`,
+  );
+}
+
 /** Order matters only for readability; TRUNCATE ... CASCADE handles the graph. */
 const TABLES = [
   "AuditLog",
