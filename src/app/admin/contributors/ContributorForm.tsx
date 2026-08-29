@@ -15,6 +15,7 @@ type Contributor = {
   city: string | null;
   state: string | null;
   pincode: string | null;
+  notes: string | null;
 };
 
 export function ContributorForm({ contributor }: { contributor?: Contributor }) {
@@ -50,9 +51,12 @@ export function ContributorForm({ contributor }: { contributor?: Contributor }) 
           <Field label="Address" htmlFor="addressLine">
             <input id="addressLine" name="addressLine" defaultValue={contributor?.addressLine ?? ""} className={inputClass} />
           </Field>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="City" htmlFor="city">
               <input id="city" name="city" defaultValue={contributor?.city ?? ""} className={inputClass} />
+            </Field>
+            <Field label="State" htmlFor="state">
+              <input id="state" name="state" defaultValue={contributor?.state ?? ""} className={inputClass} />
             </Field>
             <Field label="PIN code" htmlFor="pincode">
               <input id="pincode" name="pincode" inputMode="numeric" defaultValue={contributor?.pincode ?? ""} className={inputClass} />
@@ -60,6 +64,16 @@ export function ContributorForm({ contributor }: { contributor?: Contributor }) 
           </div>
         </div>
       </details>
+
+      <Field label="Internal notes (admin only, not shown to the contributor)" htmlFor="notes">
+        <textarea
+          id="notes"
+          name="notes"
+          rows={3}
+          defaultValue={contributor?.notes ?? ""}
+          className={`${inputClass} min-h-[88px] py-2`}
+        />
+      </Field>
 
       {state.error ? <p className="text-sm text-red-600">{state.error}</p> : null}
       {state.ok ? <p className="text-sm text-green-700">Saved.</p> : null}

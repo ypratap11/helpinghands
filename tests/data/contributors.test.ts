@@ -57,4 +57,23 @@ describe("updateContributor", () => {
   it("refuses to modify the system contributor", async () => {
     await expect(updateContributor("anonymous", { name: "Hacked" }, null)).rejects.toThrow();
   });
+
+  it("leaves an existing notes value intact when the update omits notes", async () => {
+    const created = await createContributor({ name: "Asha", notes: "Known from the shelter" }, null);
+
+    await updateContributor(created.id, { name: "Asha Nair" }, null);
+
+    const after = await prisma.contributor.findUnique({ where: { id: created.id } });
+    expect(after?.name).toBe("Asha Nair");
+    expect(after?.notes).toBe("Known from the shelter");
+  });
+
+  it("clears notes when the update explicitly sends null", async () => {
+    const created = await createContributor({ name: "Asha", notes: "Temporary" }, null);
+
+    await updateContributor(created.id, { name: "Asha", notes: null }, null);
+
+    const after = await prisma.contributor.findUnique({ where: { id: created.id } });
+    expect(after?.notes).toBeNull();
+  });
 });

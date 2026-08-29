@@ -15,6 +15,9 @@ export const contributorSchema = z.object({
 });
 
 export type ContributorInput = z.infer<typeof contributorSchema>;
+export type ContributorUpdateInput = Partial<ContributorInput>;
+
+export const ANONYMOUS_CONTRIBUTOR_ID = "anonymous";
 
 function normalise(input: ContributorInput) {
   const parsed = contributorSchema.parse(input);
@@ -57,16 +60,37 @@ export async function createContributor(input: ContributorInput, actorId: string
   return created;
 }
 
+/**
+ * Builds an update payload containing only the keys actually present on
+ * `input`, so an update that omits a field (e.g. a form that doesn't render
+ * it) leaves the existing column value untouched rather than nulling it.
+ * Prisma treats an `undefined` value in `data` as "do not change this
+ * column" (unlike an explicit `null`, which clears it), so any key not
+ * present on `input` is left out of the parsed result entirely.
+ */
+function normalisePartial(input: ContributorUpdateInput) {
+  const parsed = contributorSchema.partial().parse(input);
+  const data: ContributorUpdateInput = {};
+  for (const key of Object.keys(input) as (keyof ContributorInput)[]) {
+    if (key === "email") {
+      data.email = parsed.email ? parsed.email : null;
+    } else {
+      data[key] = parsed[key] as never;
+    }
+  }
+  return data;
+}
+
 export async function updateContributor(
   id: string,
-  input: ContributorInput,
+  input: ContributorUpdateInput,
   actorId: string | null,
 ) {
   const before = await prisma.contributor.findUnique({ where: { id } });
   if (!before) throw new Error("Contributor not found");
   if (before.isSystem) throw new Error("The Anonymous contributor cannot be edited");
 
-  const data = normalise(input);
+  const data = normalisePartial(input);
   const updated = await prisma.contributor.update({ where: { id }, data });
 
   await recordAudit({
