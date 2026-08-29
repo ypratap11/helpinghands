@@ -287,16 +287,24 @@ Playwright for the flows that matter end to end:
 **Target host:** DigitalOcean droplet at `146.190.39.48`, currently unused and
 dedicated to this project.
 
-**A hostname is required — a bare IP will not do.** Google rejects IP addresses
-as OAuth redirect URIs (only real domains, plus `localhost`), and Let's Encrypt
-will not issue a certificate for a bare IP, so Caddy could not provide HTTPS.
-Without HTTPS, session cookies carrying admin logins would cross the network in
-clear text. Plan of record: deploy first on the free wildcard-DNS hostname
-`146-190-39-48.sslip.io`, which resolves to the droplet automatically and is
-accepted by both Let's Encrypt and Google; move to a purchased domain before the
-public transparency page is shared outside the group, since a throwaway hostname
-undercuts the trust that page exists to build. Switching is a DNS change plus one
-added redirect URI in Google — no code change.
+**Hostname:** `helpinghands.augaster.com`, an A record pointing at the droplet,
+managed in Cloudflare. A bare IP was ruled out: Google rejects IP addresses as
+OAuth redirect URIs (only real domains, plus `localhost`), and Let's Encrypt will
+not issue a certificate for one, so HTTPS would be impossible and session cookies
+carrying admin logins would cross the network in clear text.
+
+**The Cloudflare record must be DNS-only (grey cloud), not proxied.** With
+proxying on, Caddy cannot complete an ACME challenge — TLS-ALPN-01 fails behind
+the proxy outright, and HTTP-01 generally fails because Cloudflare terminates TLS
+itself. Cloudflare's default Flexible SSL mode compounds this: it speaks plain
+HTTP to the origin while Caddy redirects HTTP to HTTPS, producing a redirect
+loop. If proxying is wanted later — it hides the origin IP and absorbs DDoS
+traffic — the supported path is a Cloudflare Origin Certificate installed in
+Caddy with SSL mode set to Full (strict).
+
+**Google OAuth redirect URIs:** `http://localhost:3000/api/auth/callback/google`
+for development and `https://helpinghands.augaster.com/api/auth/callback/google`
+for production, both registered on the same OAuth client.
 
 - `docker-compose.yml` runs app + db + caddy; the same file works locally and on the droplet
 - Secrets via `.env` (never committed); `.env.example` documents every variable:
