@@ -579,9 +579,76 @@ git commit -m "feat: add Indian financial-year helpers"
 
 The full model is written now, including tables used only in plans 2 and 3, so there is one migration baseline rather than a schema that churns.
 
+> **Prisma 7 deltas — verified empirically during Task 1, not assumed.** This
+> project runs Prisma 7.10.0, and three things differ from Prisma 6. They are
+> already reflected in the steps below; do not "correct" them back.
+>
+> 1. **`url` is forbidden in the `datasource` block.** Leaving it there is a hard
+>    `P1012` validation error, not a warning. The connection URL moves to a new
+>    `prisma.config.ts` at the project root (Step 0 below).
+> 2. **`new PrismaClient()` with no arguments throws at runtime** — it now
+>    requires a driver adapter. `src/lib/db.ts` must pass `@prisma/adapter-pg`
+>    (Step 0 below).
+> 3. **`prisma migrate dev` no longer auto-runs `generate` or the seed.** Run
+>    `prisma generate` and `prisma db seed` as explicit separate commands, and
+>    configure the seed in `prisma.config.ts` — the `"prisma": { "seed": ... }`
+>    block in `package.json` is silently ignored in Prisma 7.
+>
+> What did NOT change, despite expectations: the `prisma-client-js` generator
+> still works and still generates into `node_modules/@prisma/client`, the
+> `import { PrismaClient } from "@prisma/client"` import path is unchanged, and
+> `@db.Date` is still correct for a date-only column.
+
+- [ ] **Step 0: Add the Prisma 7 configuration and driver adapter**
+
+Install the dependencies Prisma 7 requires:
+
+```bash
+npm install @prisma/adapter-pg pg dotenv
+npm install -D @types/pg
+```
+
+Create `prisma.config.ts` at the project root, beside `package.json`. The
+`dotenv/config` import must be the first line — `prisma/config`'s `env()` helper
+gives type safety but does not load `.env` files by itself, and without it the
+CLI silently sees no `DATABASE_URL`.
+
+```ts
+import "dotenv/config";
+import { defineConfig, env } from "prisma/config";
+
+export default defineConfig({
+  schema: "prisma/schema.prisma",
+  migrations: {
+    path: "prisma/migrations",
+    seed: "tsx prisma/seed.ts",
+  },
+  datasource: {
+    url: env("DATABASE_URL"),
+  },
+});
+```
+
+Update `src/lib/db.ts` to construct the client with a driver adapter. Task 1
+created this file with a bare `new PrismaClient()`, which throws on Prisma 7:
+
+```ts
+import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
+
+const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
+
+const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
+
+export const prisma = globalForPrisma.prisma ?? new PrismaClient({ adapter });
+
+if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+```
+
 - [ ] **Step 1: Write the schema**
 
-Create `prisma/schema.prisma`:
+Create `prisma/schema.prisma`. Note the `datasource` block carries only
+`provider` — the URL lives in `prisma.config.ts`:
 
 ```prisma
 generator client {
@@ -590,7 +657,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 enum Role {
@@ -880,25 +946,31 @@ main()
   });
 ```
 
-Add to `package.json`:
-
-```json
-"prisma": { "seed": "tsx prisma/seed.ts" },
-```
-
-and to scripts:
+Add to `package.json` scripts. Do **not** add a top-level `"prisma": { "seed": ... }`
+block — Prisma 7 ignores it; the seed command already lives in `prisma.config.ts`
+from Step 0.
 
 ```json
 "db:seed": "tsx prisma/seed.ts",
 "db:migrate": "prisma migrate dev",
+"db:generate": "prisma generate",
 "db:reset": "prisma migrate reset --force"
 ```
 
-- [ ] **Step 4: Run the seed**
+- [ ] **Step 4: Generate the client, then run the seed**
+
+Prisma 7's `migrate dev` no longer generates the client or runs the seed for you,
+so both are explicit:
 
 ```bash
+npm run db:generate
 npm run db:seed
 ```
+
+Generating the client also fixes the `TS2305: Module '"@prisma/client"' has no
+exported member 'PrismaClient'` error that `npm run build` has been failing with
+since Task 1 — that error is simply the client not existing yet. Confirm with
+`npm run build` before you commit.
 
 Expected: exits 0. Run it a second time — it must also exit 0, proving idempotence.
 
