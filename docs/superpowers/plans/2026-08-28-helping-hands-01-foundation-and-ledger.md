@@ -1366,10 +1366,14 @@ Expected: PASS, all tests.
 
 - [ ] **Step 6: Wire the route handler and login page**
 
-Create `src/app/api/auth/[...nextauth]/route.ts`:
+Create `src/app/api/auth/[...nextauth]/route.ts`. Note that `src/lib/auth.ts`
+exports `handlers` — an object holding the two route functions — not `GET` and
+`POST` directly, so they must be destructured out of it:
 
 ```ts
-export { GET, POST } from "@/lib/auth";
+import { handlers } from "@/lib/auth";
+
+export const { GET, POST } = handlers;
 ```
 
 Create `src/app/login/page.tsx`:
