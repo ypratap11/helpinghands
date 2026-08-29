@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import { config } from "dotenv";
 import { defineConfig } from "vitest/config";
 
@@ -21,9 +22,26 @@ if (loaded.error) {
   );
 }
 
+// next@16.3.3 ships no package.json#exports field, so extensionless deep
+// imports like "next/server" and "next/cache" (used internally by
+// next-auth, and by Task 12-13's server actions via revalidatePath) cannot
+// be resolved by Vitest/Node's strict ESM resolver, even though the target
+// files exist and `require()` finds them fine. Next's own bundler
+// (Turbopack/webpack) has private resolution logic that tolerates this, so
+// the app itself is unaffected — only tooling using standard ESM resolution
+// hits it. Alias the two specifiers we need straight to their concrete
+// files, built from this config file's own location so the alias works
+// regardless of where the repo is checked out (this path contains a space).
+const nextServer = fileURLToPath(new URL("./node_modules/next/server.js", import.meta.url));
+const nextCache = fileURLToPath(new URL("./node_modules/next/cache.js", import.meta.url));
+
 export default defineConfig({
   resolve: {
     tsconfigPaths: true,
+    alias: [
+      { find: "next/server", replacement: nextServer },
+      { find: "next/cache", replacement: nextCache },
+    ],
   },
   test: {
     environment: "node",
@@ -31,5 +49,16 @@ export default defineConfig({
     globals: true,
     setupFiles: ["tests/helpers/db.ts"],
     fileParallelism: false,
+    server: {
+      deps: {
+        // By default Vitest loads node_modules packages via Node's native
+        // ESM loader, bypassing Vite's resolver (and therefore the alias
+        // above) entirely. next-auth and @auth/core need to go through
+        // Vite's resolution so their internal "next/server" import actually
+        // hits the alias instead of Node's native (extension-strict)
+        // resolver.
+        inline: [/next-auth/, /@auth\/core/],
+      },
+    },
   },
 });
