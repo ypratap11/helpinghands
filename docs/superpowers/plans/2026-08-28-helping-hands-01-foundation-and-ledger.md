@@ -1203,10 +1203,18 @@ git commit -m "test: isolate tests in a dedicated database with per-test reset"
 >    on Prisma and types. `src/lib/auth.ts` imports them and does the framework
 >    wiring. This matches how `money.ts` and `fy.ts` are already framework-free,
 >    and it means the logic is testable without booting an auth framework.
-> 2. **`vitest.config.mts` aliases `next/server` and `next/cache`** to the real
->    files in `node_modules/next/`, which exist and load correctly — only the
->    extensionless specifier is unresolvable. Later tasks need this too: Task 7's
->    guards and Tasks 12–13's server actions all transitively reach these modules.
+> 2. **`vitest.config.mts` sets `server.deps.inline` for `next-auth`.** This is
+>    the load-bearing setting: inlining routes the import through Vite's resolver
+>    rather than Node's strict ESM resolver, which is what actually resolves the
+>    extensionless specifier. Later tasks need this too — Task 7's guards and
+>    Tasks 12–13's server actions all transitively reach these modules.
+>
+>    An `alias` for `next/server` and `next/cache` was tried first and **proved
+>    inert** — verified by disabling it and watching the suite stay green, then
+>    disabling `deps.inline` instead and watching the original failure return. The
+>    alias is kept as defence in depth but is not what fixes this. `tests/lib/auth-wiring.test.ts`
+>    is the standing proof that `@/lib/auth` loads under Vitest at all; do not
+>    delete it as redundant.
 
 **Interfaces:**
 - Consumes: `prisma` from `src/lib/db.ts`
