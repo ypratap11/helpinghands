@@ -6,7 +6,24 @@
 
 **Architecture:** One Next.js App Router application backed by PostgreSQL through Prisma. Pure logic (money, financial years, receipt numbering) lives in `src/lib/*` as framework-free modules that are unit-tested directly. All database reads and writes go through a data-access layer in `src/lib/data/*`, so authorization filters live in one place instead of being retyped on every page. Postgres runs in Docker locally and on the droplet, so development and production share one database engine.
 
-**Tech Stack:** Next.js 15 (App Router, TypeScript), React 19, Tailwind CSS v4, Prisma 6, PostgreSQL 16, Auth.js v5 (`next-auth@beta`) with the Prisma adapter and Google provider, Vitest for tests, Docker Compose.
+**Tech Stack:** Next.js (App Router, TypeScript), React, Tailwind CSS v4, Prisma, PostgreSQL 16, Auth.js v5 (`next-auth@beta`) with the Prisma adapter and Google provider, Vitest for tests, Docker Compose.
+
+**Versions actually installed** (resolved during Task 1 — these supersede any version named elsewhere in this plan):
+
+| Package | Installed |
+|---|---|
+| next | 16.3.3 |
+| react | 19.2.8 |
+| prisma / @prisma/client | 7.10.0 |
+| zod | 4.5.2 |
+| vitest | 4.1.11 |
+| tailwindcss | 4.x |
+
+The plan text was drafted against Next 15 / Prisma 6 / Zod 3. Where a task's code
+conflicts with the installed major version, **the installed version wins** — adapt
+the code and say so in your report. Known deltas to watch: Prisma 7 changed the
+client generator contract (Task 4), and Zod 4 prefers `z.email()` over the
+deprecated `z.string().email()` (Task 10).
 
 **Spec:** `docs/superpowers/specs/2026-08-28-helping-hands-design.md`
 
