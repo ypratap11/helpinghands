@@ -25,13 +25,23 @@ if (loaded.error) {
 // next@16.3.3 ships no package.json#exports field, so extensionless deep
 // imports like "next/server" and "next/cache" (used internally by
 // next-auth, and by Task 12-13's server actions via revalidatePath) cannot
-// be resolved by Vitest/Node's strict ESM resolver, even though the target
-// files exist and `require()` finds them fine. Next's own bundler
+// be resolved by Node's strict ESM resolver, even though the target files
+// exist and `require()` finds them fine. Next's own bundler
 // (Turbopack/webpack) has private resolution logic that tolerates this, so
 // the app itself is unaffected — only tooling using standard ESM resolution
-// hits it. Alias the two specifiers we need straight to their concrete
-// files, built from this config file's own location so the alias works
-// regardless of where the repo is checked out (this path contains a space).
+// hits it. Pin the two specifiers we need straight to their concrete files,
+// built from this config file's own location so the alias works regardless
+// of where the repo is checked out (this path contains a space).
+//
+// Verified experimentally (tests/lib/auth-wiring.test.ts, see task-6-report
+// "Fix round 2"): the `server.deps.inline` setting below is what's actually
+// necessary and sufficient here — once next-auth/@auth/core are routed
+// through Vite's resolver instead of Node's native loader, Vite's own
+// legacy-fallback resolution (used for packages without "exports") already
+// finds "next/server.js" without this alias. This alias is kept anyway as
+// an explicit, version-independent pin: Vite's extension-fallback is an
+// implementation detail of its resolver, not a guaranteed contract, so
+// don't remove this on the assumption it's dead code.
 const nextServer = fileURLToPath(new URL("./node_modules/next/server.js", import.meta.url));
 const nextCache = fileURLToPath(new URL("./node_modules/next/cache.js", import.meta.url));
 
@@ -51,12 +61,13 @@ export default defineConfig({
     fileParallelism: false,
     server: {
       deps: {
-        // By default Vitest loads node_modules packages via Node's native
-        // ESM loader, bypassing Vite's resolver (and therefore the alias
-        // above) entirely. next-auth and @auth/core need to go through
-        // Vite's resolution so their internal "next/server" import actually
-        // hits the alias instead of Node's native (extension-strict)
-        // resolver.
+        // Load-bearing (verified: removing this reproduces the "Cannot
+        // find module .../next/server" failure even with the alias above
+        // still in place). By default Vitest loads node_modules packages
+        // via Node's native ESM loader, bypassing Vite's resolver
+        // entirely. next-auth and @auth/core need to be routed through
+        // Vite's resolver instead, so their internal "next/server" /
+        // "next/cache" imports resolve.
         inline: [/next-auth/, /@auth\/core/],
       },
     },
