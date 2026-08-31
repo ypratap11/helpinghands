@@ -4,7 +4,7 @@ import { CaseCard } from "@/components/CaseCard";
 import { Money } from "@/components/ui/Money";
 import { listPublishedCases, publicImpact } from "@/lib/data/public";
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   const [impact, cases] = await Promise.all([publicImpact(), listPublishedCases(6)]);
