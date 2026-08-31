@@ -111,6 +111,7 @@ export async function saveCaseAction(
 
   revalidatePath("/admin/cases");
   if (id) revalidatePath(`/admin/cases/${id}`);
+  revalidatePath("/");
   return { ok: true };
 }
 
@@ -129,6 +130,8 @@ export async function setPublishedAction(data: FormData): Promise<void> {
   await setCasePublished(id, published, actor.id);
   revalidatePath("/admin/cases");
   revalidatePath(`/admin/cases/${id}`);
+  revalidatePath("/");
+  revalidatePath(`/cases/${id}`);
 }
 
 export async function addDisbursementAction(
@@ -183,5 +186,7 @@ export async function addDisbursementAction(
 
   revalidatePath(`/admin/cases/${caseId}`);
   revalidatePath("/admin/cases");
+  revalidatePath("/");
+  revalidatePath(`/cases/${caseId}`);
   return { ok: true };
 }
