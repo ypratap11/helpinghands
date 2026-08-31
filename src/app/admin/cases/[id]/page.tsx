@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/Button";
 import { Money } from "@/components/ui/Money";
 import { CASE_CATEGORIES } from "@/lib/categories";
 import { caseDisbursedTotal, getCase } from "@/lib/data/cases";
+import { caseRaisedTotal, listCaseContributions } from "@/lib/data/contributions";
 import { todayInIndia } from "@/lib/fy";
 import { CaseForm } from "../CaseForm";
 import { setPublishedAction } from "../actions";
@@ -23,7 +24,11 @@ export default async function EditCasePage({
   if (!caseRecord) notFound();
 
   const today = todayInIndia();
-  const total = await caseDisbursedTotal(id);
+  const [total, raised, caseContributions] = await Promise.all([
+    caseDisbursedTotal(id),
+    caseRaisedTotal(id),
+    listCaseContributions(id),
+  ]);
 
   return (
     <div className="flex flex-col gap-8">
@@ -46,6 +51,33 @@ export default async function EditCasePage({
       <section className="rounded-2xl border border-line bg-surface p-6 lift">
         <h2 className="pb-4 font-display text-lg font-semibold text-ink">Details</h2>
         <CaseForm categories={CASE_CATEGORIES} today={today} caseRecord={caseRecord} />
+      </section>
+
+      <section className="rounded-2xl border border-line bg-surface p-6 lift">
+        <div className="flex items-baseline justify-between pb-4">
+          <h2 className="font-display text-lg font-semibold text-ink">Raised for this cause</h2>
+          <span className="text-sm text-muted">
+            <Money paise={raised} compact className="font-semibold text-forest" />
+          </span>
+        </div>
+        <RecordList
+          items={caseContributions}
+          empty="No contributions earmarked for this cause yet."
+          columns={[
+            { key: "date", header: "Date", cell: (c) => formatDate(c.receivedOn) },
+            { key: "from", header: "From", cell: (c) => c.contributor.name },
+            { key: "amount", header: "Amount", cell: (c) => <Money paise={c.amountPaise} compact /> },
+          ]}
+          renderCard={(c) => (
+            <div className="flex flex-col gap-1">
+              <div className="flex items-baseline justify-between">
+                <span className="font-medium">{c.contributor.name}</span>
+                <Money paise={c.amountPaise} compact />
+              </div>
+              <span className="text-sm text-muted">{formatDate(c.receivedOn)}</span>
+            </div>
+          )}
+        />
       </section>
 
       <section className="rounded-2xl border border-line bg-surface p-6 lift">

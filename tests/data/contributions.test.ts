@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { prisma } from "@/lib/db";
+import { createCase } from "@/lib/data/cases";
 import { createContributor } from "@/lib/data/contributors";
 import {
+  caseRaisedTotal,
   createContribution,
   ledgerTotals,
+  listCaseContributions,
   listContributions,
   listMyContributions,
   voidContribution,
@@ -11,6 +14,19 @@ import {
 
 async function aContributor(name = "Asha", email?: string) {
   return createContributor({ name, email: email ?? null }, null);
+}
+
+async function aCase(overrides: Record<string, unknown> = {}) {
+  return createCase(
+    {
+      title: "Hospital bill for a daily-wage worker",
+      category: "MEDICAL",
+      publicSummary: "Medical support for a family after an accident.",
+      occurredOn: new Date(Date.UTC(2026, 5, 10)),
+      ...overrides,
+    },
+    null,
+  );
 }
 
 describe("createContribution", () => {
@@ -96,6 +112,63 @@ describe("createContribution", () => {
       where: { entityType: "Contribution", entityId: created.id },
     });
     expect(audit?.action).toBe("CREATE");
+  });
+
+  it("persists an optional caseId when the contribution is earmarked for a cause", async () => {
+    const contributor = await aContributor();
+    const caseRecord = await aCase();
+
+    const created = await createContribution(
+      {
+        contributorId: contributor.id,
+        amountPaise: 100000,
+        receivedOn: new Date(Date.UTC(2026, 7, 28)),
+        mode: "CASH",
+        caseId: caseRecord.id,
+      },
+      null,
+    );
+
+    expect(created.caseId).toBe(caseRecord.id);
+    const row = await prisma.contribution.findUnique({ where: { id: created.id } });
+    expect(row?.caseId).toBe(caseRecord.id);
+  });
+
+  it("stores null caseId for a general contribution not tied to any cause", async () => {
+    const contributor = await aContributor();
+
+    const created = await createContribution(
+      {
+        contributorId: contributor.id,
+        amountPaise: 100000,
+        receivedOn: new Date(Date.UTC(2026, 7, 28)),
+        mode: "CASH",
+      },
+      null,
+    );
+
+    expect(created.caseId).toBeNull();
+  });
+
+  it("includes caseId in the audit after-snapshot", async () => {
+    const contributor = await aContributor();
+    const caseRecord = await aCase();
+
+    const created = await createContribution(
+      {
+        contributorId: contributor.id,
+        amountPaise: 100000,
+        receivedOn: new Date(Date.UTC(2026, 7, 28)),
+        mode: "CASH",
+        caseId: caseRecord.id,
+      },
+      null,
+    );
+
+    const audit = await prisma.auditLog.findFirst({
+      where: { entityType: "Contribution", entityId: created.id },
+    });
+    expect((audit?.after as { caseId: string | null }).caseId).toBe(caseRecord.id);
   });
 });
 
@@ -196,6 +269,147 @@ describe("listContributions", () => {
 
     expect((await listContributions({ financialYear: "2025-26" })).length).toBe(1);
     expect((await listContributions({ financialYear: "2026-27" })).length).toBe(1);
+  });
+
+  it("includes the linked case's id and title for an earmarked contribution", async () => {
+    const contributor = await aContributor();
+    const caseRecord = await aCase({ title: "Flood relief" });
+    await createContribution(
+      {
+        contributorId: contributor.id,
+        amountPaise: 100,
+        receivedOn: new Date(Date.UTC(2026, 7, 28)),
+        mode: "CASH",
+        caseId: caseRecord.id,
+      },
+      null,
+    );
+
+    const [found] = await listContributions();
+    expect(found.case).toEqual({ id: caseRecord.id, title: "Flood relief" });
+  });
+
+  it("returns a null case for a general contribution", async () => {
+    const contributor = await aContributor();
+    await createContribution(
+      {
+        contributorId: contributor.id,
+        amountPaise: 100,
+        receivedOn: new Date(Date.UTC(2026, 7, 28)),
+        mode: "CASH",
+      },
+      null,
+    );
+
+    const [found] = await listContributions();
+    expect(found.case).toBeNull();
+  });
+});
+
+describe("caseRaisedTotal", () => {
+  it("sums only ACTIVE contributions earmarked for that case", async () => {
+    const contributor = await aContributor();
+    const caseRecord = await aCase();
+    const otherCase = await aCase({ title: "Other cause" });
+
+    const keep = await createContribution(
+      {
+        contributorId: contributor.id,
+        amountPaise: 100000,
+        receivedOn: new Date(Date.UTC(2026, 7, 28)),
+        mode: "CASH",
+        caseId: caseRecord.id,
+      },
+      null,
+    );
+    const voided = await createContribution(
+      {
+        contributorId: contributor.id,
+        amountPaise: 500000,
+        receivedOn: new Date(Date.UTC(2026, 7, 28)),
+        mode: "CASH",
+        caseId: caseRecord.id,
+      },
+      null,
+    );
+    await createContribution(
+      {
+        contributorId: contributor.id,
+        amountPaise: 900000,
+        receivedOn: new Date(Date.UTC(2026, 7, 28)),
+        mode: "CASH",
+        caseId: otherCase.id,
+      },
+      null,
+    );
+
+    await voidContribution(voided.id, null);
+
+    expect(await caseRaisedTotal(caseRecord.id)).toBe(100000n);
+    expect(keep.status).toBe("ACTIVE");
+  });
+
+  it("returns zero for a case with no earmarked contributions", async () => {
+    const caseRecord = await aCase();
+    expect(await caseRaisedTotal(caseRecord.id)).toBe(0n);
+  });
+});
+
+describe("listCaseContributions", () => {
+  it("returns ACTIVE contributions for the case, newest first", async () => {
+    const contributor = await aContributor("Asha");
+    const caseRecord = await aCase();
+    const otherCase = await aCase({ title: "Other cause" });
+
+    const older = await createContribution(
+      {
+        contributorId: contributor.id,
+        amountPaise: 100000,
+        receivedOn: new Date(Date.UTC(2026, 7, 1)),
+        mode: "CASH",
+        caseId: caseRecord.id,
+      },
+      null,
+    );
+    const newer = await createContribution(
+      {
+        contributorId: contributor.id,
+        amountPaise: 200000,
+        receivedOn: new Date(Date.UTC(2026, 7, 15)),
+        mode: "CASH",
+        caseId: caseRecord.id,
+      },
+      null,
+    );
+    const voided = await createContribution(
+      {
+        contributorId: contributor.id,
+        amountPaise: 300000,
+        receivedOn: new Date(Date.UTC(2026, 7, 20)),
+        mode: "CASH",
+        caseId: caseRecord.id,
+      },
+      null,
+    );
+    await voidContribution(voided.id, null);
+    await createContribution(
+      {
+        contributorId: contributor.id,
+        amountPaise: 400000,
+        receivedOn: new Date(Date.UTC(2026, 7, 25)),
+        mode: "CASH",
+        caseId: otherCase.id,
+      },
+      null,
+    );
+
+    const list = await listCaseContributions(caseRecord.id);
+    expect(list.map((c) => c.id)).toEqual([newer.id, older.id]);
+  });
+
+  it("returns an empty list for a case with no contributions", async () => {
+    const caseRecord = await aCase();
+    expect(await listCaseContributions(caseRecord.id)).toEqual([]);
   });
 });
 

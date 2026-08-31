@@ -11,6 +11,7 @@ export const contributionSchema = z.object({
   mode: z.enum(["UPI", "CASH", "BANK", "CHEQUE", "OTHER"]),
   reference: z.string().trim().optional().nullable(),
   note: z.string().trim().optional().nullable(),
+  caseId: z.string().optional().nullable(),
 });
 
 export type ContributionInput = z.infer<typeof contributionSchema>;
@@ -34,6 +35,7 @@ export async function createContribution(input: ContributionInput, actorId: stri
         note: data.note || null,
         receiptNo,
         recordedByUserId: actorId,
+        caseId: data.caseId || null,
       },
     });
 
@@ -42,7 +44,12 @@ export async function createContribution(input: ContributionInput, actorId: stri
       action: "CREATE",
       entityType: "Contribution",
       entityId: row.id,
-      after: { amountPaise: row.amountPaise, receiptNo: row.receiptNo, mode: row.mode },
+      after: {
+        amountPaise: row.amountPaise,
+        receiptNo: row.receiptNo,
+        mode: row.mode,
+        caseId: row.caseId,
+      },
       tx,
     });
 
@@ -82,7 +89,10 @@ export async function listContributions(filter?: {
       ...(filter?.contributorId ? { contributorId: filter.contributorId } : {}),
       ...(range ? { receivedOn: { gte: range.start, lte: range.end } } : {}),
     },
-    include: { contributor: { select: { id: true, name: true } } },
+    include: {
+      contributor: { select: { id: true, name: true } },
+      case: { select: { id: true, title: true } },
+    },
     orderBy: [{ receivedOn: "desc" }, { createdAt: "desc" }],
   });
 }
@@ -94,6 +104,22 @@ export async function listContributions(filter?: {
 export async function listMyContributions(userId: string) {
   return prisma.contribution.findMany({
     where: { status: "ACTIVE", contributor: { userId } },
+    orderBy: { receivedOn: "desc" },
+  });
+}
+
+export async function caseRaisedTotal(caseId: string): Promise<bigint> {
+  const result = await prisma.contribution.aggregate({
+    where: { caseId, status: "ACTIVE" },
+    _sum: { amountPaise: true },
+  });
+  return BigInt(result._sum.amountPaise ?? 0);
+}
+
+export async function listCaseContributions(caseId: string) {
+  return prisma.contribution.findMany({
+    where: { caseId, status: "ACTIVE" },
+    include: { contributor: { select: { id: true, name: true } } },
     orderBy: { receivedOn: "desc" },
   });
 }

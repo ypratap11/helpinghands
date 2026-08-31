@@ -138,13 +138,16 @@ model Contribution {
   receiptNo        String?            @unique
   status           ContributionStatus @default(ACTIVE)
   recordedByUserId String?
+  caseId           String?
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
 
   contributor Contributor @relation(fields: [contributorId], references: [id], onDelete: Restrict)
+  case        Case?       @relation(fields: [caseId], references: [id], onDelete: SetNull)
 
   @@index([receivedOn])
   @@index([contributorId, status])
+  @@index([caseId])
 }
 
 model Case {
@@ -165,6 +168,7 @@ model Case {
   updatedAt          DateTime     @updatedAt
 
   disbursements Disbursement[]
+  contributions Contribution[]
 
   @@index([isPublished, occurredOn])
 }
