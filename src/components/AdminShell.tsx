@@ -6,6 +6,7 @@ const TABS = [
   { href: "/admin", label: "Overview", icon: "M3 11.5 12 4l9 7.5M5.5 10v9.5h13V10" },
   { href: "/admin/contributions", label: "Money in", icon: "M12 4v16M6 10l6-6 6 6" },
   { href: "/admin/contributors", label: "People", icon: "M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm8 0a3 3 0 1 0 0-6M3 19c0-2.8 2.2-5 5-5s5 2.2 5 5m3-5c2.8 0 5 2.2 5 5" },
+  { href: "/admin/cases", label: "Causes", icon: "M12 21s-7-4.35-9.5-8.8C.8 8.6 2.3 5 6 5c2 0 3.3 1.1 4 2.2C10.7 6.1 12 5 14 5c3.7 0 5.2 3.6 3.5 7.2C19.5 16.65 12 21 12 21Z" },
 ];
 
 async function signOutAction() {
