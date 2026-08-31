@@ -40,8 +40,8 @@ export function ContributorForm({ contributor }: { contributor?: Contributor }) 
         <input id="phone" name="phone" type="tel" inputMode="tel" defaultValue={contributor?.phone ?? ""} className={inputClass} />
       </Field>
 
-      <details className="rounded-lg border border-neutral-200 bg-white p-4">
-        <summary className="cursor-pointer text-sm font-medium">
+      <details className="rounded-xl border border-line bg-forest-soft/40 p-4">
+        <summary className="cursor-pointer text-sm font-semibold text-ink">
           Tax details (needed later for 80G)
         </summary>
         <div className="flex flex-col gap-4 pt-4">
@@ -75,8 +75,8 @@ export function ContributorForm({ contributor }: { contributor?: Contributor }) 
         />
       </Field>
 
-      {state.error ? <p className="text-sm text-red-600">{state.error}</p> : null}
-      {state.ok ? <p className="text-sm text-green-700">Saved.</p> : null}
+      {state.error ? <p className="text-sm text-danger">{state.error}</p> : null}
+      {state.ok ? <p className="text-sm font-medium text-forest">Saved.</p> : null}
 
       <Button type="submit" disabled={pending} className="w-full sm:w-auto">
         {pending ? "Saving…" : "Save"}

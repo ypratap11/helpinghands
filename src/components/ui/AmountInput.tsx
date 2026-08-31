@@ -14,7 +14,7 @@ export function AmountInput({
   return (
     <Field label={label} htmlFor={name} error={error}>
       <div className="relative">
-        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500">
+        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted">
           ₹
         </span>
         <input

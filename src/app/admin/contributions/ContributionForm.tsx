@@ -77,8 +77,8 @@ export function ContributionForm({
         <input id="reference" name="reference" className={inputClass} />
       </Field>
 
-      {state.error ? <p className="text-sm text-red-600">{state.error}</p> : null}
-      {state.ok ? <p className="text-sm text-green-700">Recorded.</p> : null}
+      {state.error ? <p className="text-sm text-danger">{state.error}</p> : null}
+      {state.ok ? <p className="text-sm font-medium text-forest">Recorded.</p> : null}
 
       <Button type="submit" disabled={pending} className="w-full sm:w-auto">
         {pending ? "Saving…" : "Record contribution"}

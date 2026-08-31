@@ -19,11 +19,14 @@ export default async function ContributionsPage() {
   const today = todayInIndia();
 
   return (
-    <div className="flex flex-col gap-6">
-      <h1 className="text-xl font-semibold">Money in</h1>
+    <div className="flex flex-col gap-8">
+      <header>
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted">Ledger</p>
+        <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight text-ink">Money in</h1>
+      </header>
 
-      <section className="rounded-lg border border-neutral-200 bg-white p-4">
-        <h2 className="pb-4 font-medium">Record a contribution</h2>
+      <section className="rounded-2xl border border-line bg-surface p-6 lift">
+        <h2 className="pb-4 font-display text-lg font-semibold text-ink">Record a contribution</h2>
         <ContributionForm
           contributors={contributors}
           today={today}
@@ -44,7 +47,7 @@ export default async function ContributionsPage() {
             header: "",
             cell: (c) =>
               c.status === "VOID" ? (
-                <span className="text-xs text-red-600">Voided</span>
+                <span className="inline-flex items-center rounded-full bg-[color-mix(in_srgb,var(--color-danger)_10%,white)] px-2.5 py-0.5 text-xs font-semibold text-danger">Voided</span>
               ) : (
                 <VoidButton id={c.id} action={voidContributionAction} />
               ),
@@ -56,18 +59,18 @@ export default async function ContributionsPage() {
               <span className="font-medium">{c.contributor.name}</span>
               <Money paise={c.amountPaise} compact />
             </div>
-            <span className="text-sm text-neutral-500">
+            <span className="text-sm text-muted">
               {formatDate(c.receivedOn)} · {c.mode}
               {c.status === "VOID" ? " · Voided" : ""}
             </span>
-            <span className="text-xs text-neutral-400">{c.receiptNo ?? ""}</span>
+            <span className="text-xs text-muted">{c.receiptNo ?? ""}</span>
             {c.status === "ACTIVE" ? (
               <div className="pt-1">
                 <VoidButton
                   id={c.id}
                   action={voidContributionAction}
                   label="Void this entry"
-                  className="inline-flex min-h-[44px] items-center text-sm text-neutral-500 underline"
+                  className="inline-flex min-h-[44px] items-center text-sm font-medium text-danger underline"
                 />
               </div>
             ) : null}

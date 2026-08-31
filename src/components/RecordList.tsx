@@ -14,25 +14,32 @@ export function RecordList<T extends { id: string }>({
   empty?: string;
 }) {
   if (items.length === 0) {
-    return <p className="rounded-lg bg-white p-6 text-center text-neutral-500">{empty}</p>;
+    return (
+      <p className="rounded-2xl border border-dashed border-line bg-surface/60 p-8 text-center text-sm text-muted">
+        {empty}
+      </p>
+    );
   }
 
   return (
     <>
       <ul className="flex flex-col gap-3 sm:hidden">
         {items.map((item) => (
-          <li key={item.id} className="rounded-lg border border-neutral-200 bg-white p-4">
+          <li key={item.id} className="rounded-2xl border border-line bg-surface p-4 lift">
             {renderCard(item)}
           </li>
         ))}
       </ul>
 
-      <div className="hidden overflow-x-auto rounded-lg border border-neutral-200 bg-white sm:block">
+      <div className="hidden overflow-x-auto rounded-2xl border border-line bg-surface lift sm:block">
         <table className="w-full text-left text-sm">
-          <thead className="border-b border-neutral-200 bg-neutral-50">
-            <tr>
+          <thead>
+            <tr className="border-b border-line bg-forest-soft/50">
               {columns.map((column) => (
-                <th key={column.key} className="px-4 py-3 font-medium text-neutral-600">
+                <th
+                  key={column.key}
+                  className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted"
+                >
                   {column.header}
                 </th>
               ))}
@@ -40,9 +47,12 @@ export function RecordList<T extends { id: string }>({
           </thead>
           <tbody>
             {items.map((item) => (
-              <tr key={item.id} className="border-b border-neutral-100 last:border-0">
+              <tr
+                key={item.id}
+                className="border-b border-line/70 last:border-0 hover:bg-forest-soft/30"
+              >
                 {columns.map((column) => (
-                  <td key={column.key} className="px-4 py-3">
+                  <td key={column.key} className="px-4 py-3.5 align-middle">
                     {column.cell(item)}
                   </td>
                 ))}

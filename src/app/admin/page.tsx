@@ -5,20 +5,57 @@ export default async function AdminDashboard() {
   const totals = await ledgerTotals();
 
   const cards = [
-    { label: "Collected", value: totals.collectedPaise },
-    { label: "Given out", value: totals.disbursedPaise },
-    { label: "In hand", value: totals.balancePaise },
+    {
+      label: "Collected",
+      value: totals.collectedPaise,
+      note: "Everything contributed so far",
+      accent: false,
+    },
+    {
+      label: "Given out",
+      value: totals.disbursedPaise,
+      note: "Help disbursed to date",
+      accent: false,
+    },
+    {
+      label: "In hand",
+      value: totals.balancePaise,
+      note: "Available to give right now",
+      accent: true,
+    },
   ];
 
   return (
-    <div className="flex flex-col gap-6">
-      <h1 className="text-xl font-semibold">Overview</h1>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+    <div className="flex flex-col gap-8">
+      <header>
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted">Overview</p>
+        <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight text-ink">
+          The ledger, at a glance
+        </h1>
+      </header>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {cards.map((card) => (
-          <div key={card.label} className="rounded-lg border border-neutral-200 bg-white p-4">
-            <p className="text-sm text-neutral-500">{card.label}</p>
-            <p className="pt-1 text-2xl font-semibold">
+          <div
+            key={card.label}
+            className={`rounded-2xl border p-6 lift ${
+              card.accent
+                ? "border-forest/20 bg-forest text-white"
+                : "border-line bg-surface text-ink"
+            }`}
+          >
+            <p
+              className={`text-xs font-semibold uppercase tracking-wide ${
+                card.accent ? "text-white/70" : "text-muted"
+              }`}
+            >
+              {card.label}
+            </p>
+            <p className="mt-3 font-display text-4xl font-semibold tracking-tight">
               <Money paise={card.value} compact />
+            </p>
+            <p className={`mt-2 text-sm ${card.accent ? "text-white/75" : "text-muted"}`}>
+              {card.note}
             </p>
           </div>
         ))}

@@ -12,8 +12,11 @@ export default async function EditContributorPage({
   if (!contributor || contributor.isSystem) notFound();
 
   return (
-    <div className="flex flex-col gap-6">
-      <h1 className="text-xl font-semibold">{contributor.name}</h1>
+    <div className="flex flex-col gap-8">
+      <header>
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted">Edit person</p>
+        <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight text-ink">{contributor.name}</h1>
+      </header>
       <ContributorForm contributor={contributor} />
     </div>
   );

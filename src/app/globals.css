@@ -1,26 +1,109 @@
 @import "tailwindcss";
 
+@theme {
+  /* Palette — warm paper, forest green, marigold */
+  --color-paper: #fbf8f1;
+  --color-surface: #ffffff;
+  --color-ink: #17251e;
+  --color-muted: #5f6c63;
+  --color-line: #e9e2d4;
+  --color-forest: #1e5b44;
+  --color-forest-dark: #163f30;
+  --color-forest-soft: #e9f1e8;
+  --color-marigold: #e0942a;
+  --color-marigold-soft: #fbe8c6;
+  --color-danger: #b0432f;
+
+  /* Type — families are supplied by next/font on <html> */
+  --font-display: var(--f-display), ui-serif, Georgia, "Times New Roman", serif;
+  --font-sans: var(--f-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--f-mono), ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: light;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: Arial, Helvetica, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-forest);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Tabular, lined-up figures for money everywhere */
+.nums {
+  font-feature-settings: "tnum" 1, "lnum" 1;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* Signature: a marigold highlighter under one key word per screen */
+.mark {
+  background-image: linear-gradient(
+    to top,
+    var(--color-marigold-soft) 0,
+    var(--color-marigold-soft) 36%,
+    transparent 36%
+  );
+  padding-inline: 0.06em;
+  border-radius: 2px;
+}
+
+/* Warm ambient wash for full-screen centered pages */
+.aura {
+  background:
+    radial-gradient(
+      55rem 38rem at 96% -12%,
+      color-mix(in srgb, var(--color-marigold) 14%, transparent),
+      transparent 62%
+    ),
+    radial-gradient(
+      48rem 40rem at -12% 112%,
+      color-mix(in srgb, var(--color-forest) 13%, transparent),
+      transparent 60%
+    ),
+    var(--color-paper);
+}
+
+/* Soft card lift */
+.lift {
+  box-shadow:
+    0 1px 2px color-mix(in srgb, var(--color-ink) 5%, transparent),
+    0 10px 30px -18px color-mix(in srgb, var(--color-forest) 30%, transparent);
+}
+
+/* Gentle load-in */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.rise {
+  animation: rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

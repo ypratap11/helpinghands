@@ -2,10 +2,13 @@ import type { ButtonHTMLAttributes } from "react";
 
 type Variant = "primary" | "secondary" | "danger";
 
+const base =
+  "inline-flex min-h-[44px] items-center justify-center rounded-xl px-5 text-sm font-semibold transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50";
+
 const styles: Record<Variant, string> = {
-  primary: "bg-neutral-900 text-white hover:bg-neutral-800",
-  secondary: "bg-white text-neutral-900 border border-neutral-300 hover:bg-neutral-100",
-  danger: "bg-red-600 text-white hover:bg-red-700",
+  primary: "bg-forest text-white hover:bg-forest-dark shadow-sm",
+  secondary: "bg-surface text-forest border border-line hover:bg-forest-soft",
+  danger: "bg-surface text-danger border border-line hover:bg-[color-mix(in_srgb,var(--color-danger)_8%,white)]",
 };
 
 export function Button({
@@ -13,10 +16,5 @@ export function Button({
   className = "",
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant }) {
-  return (
-    <button
-      {...props}
-      className={`inline-flex min-h-[44px] items-center justify-center rounded-lg px-4 text-sm font-medium disabled:opacity-50 ${styles[variant]} ${className}`}
-    />
-  );
+  return <button {...props} className={`${base} ${styles[variant]} ${className}`} />;
 }

@@ -26,7 +26,7 @@ export function VoidButton({
       <button
         type="button"
         onClick={() => setConfirming(true)}
-        className={className ?? "inline-flex min-h-[44px] items-center px-2 text-xs text-neutral-500 underline"}
+        className={className ?? "inline-flex min-h-[44px] items-center px-2 text-xs text-muted underline"}
       >
         {label}
       </button>
@@ -38,14 +38,14 @@ export function VoidButton({
       <input type="hidden" name="id" value={id} />
       <button
         type="submit"
-        className={className ?? "inline-flex min-h-[44px] items-center px-2 text-xs text-red-600 underline"}
+        className={className ?? "inline-flex min-h-[44px] items-center px-2 text-xs text-danger underline"}
       >
         Confirm void
       </button>
       <button
         type="button"
         onClick={() => setConfirming(false)}
-        className="inline-flex min-h-[44px] items-center px-2 text-xs text-neutral-400 underline"
+        className="inline-flex min-h-[44px] items-center px-2 text-xs text-muted underline"
       >
         Cancel
       </button>

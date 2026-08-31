@@ -7,27 +7,30 @@ export default async function ContributorsPage() {
   const contributors = await listContributors();
 
   return (
-    <div className="flex flex-col gap-6">
-      <h1 className="text-xl font-semibold">People</h1>
+    <div className="flex flex-col gap-8">
+      <header>
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted">Ledger</p>
+        <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight text-ink">People</h1>
+      </header>
 
       <RecordList
         items={contributors}
         empty="No one added yet."
         columns={[
-          { key: "name", header: "Name", cell: (c) => <Link href={`/admin/contributors/${c.id}`}>{c.name}</Link> },
+          { key: "name", header: "Name", cell: (c) => <Link href={`/admin/contributors/${c.id}`} className="font-semibold text-forest hover:underline">{c.name}</Link> },
           { key: "email", header: "Email", cell: (c) => c.email ?? "—" },
           { key: "phone", header: "Phone", cell: (c) => c.phone ?? "—" },
         ]}
         renderCard={(c) => (
           <Link href={`/admin/contributors/${c.id}`} className="flex flex-col gap-1">
-            <span className="font-medium">{c.name}</span>
-            <span className="text-sm text-neutral-500">{c.email ?? c.phone ?? "No contact"}</span>
+            <span className="font-semibold text-ink">{c.name}</span>
+            <span className="text-sm text-muted">{c.email ?? c.phone ?? "No contact"}</span>
           </Link>
         )}
       />
 
-      <section className="rounded-lg border border-neutral-200 bg-white p-4">
-        <h2 className="pb-4 font-medium">Add someone</h2>
+      <section className="rounded-2xl border border-line bg-surface p-6 lift">
+        <h2 className="pb-4 font-display text-lg font-semibold text-ink">Add someone</h2>
         <ContributorForm />
       </section>
     </div>
