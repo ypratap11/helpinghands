@@ -1,5 +1,6 @@
 import { RecordList } from "@/components/RecordList";
 import { Money } from "@/components/ui/Money";
+import { listCases } from "@/lib/data/cases";
 import { listContributions } from "@/lib/data/contributions";
 import { ANONYMOUS_CONTRIBUTOR_ID, listContributors } from "@/lib/data/contributors";
 import { todayInIndia } from "@/lib/fy";
@@ -12,11 +13,16 @@ function formatDate(value: Date) {
 }
 
 export default async function ContributionsPage() {
-  const [contributions, contributors] = await Promise.all([
+  const [contributions, contributors, cases] = await Promise.all([
     listContributions(),
     listContributors(),
+    listCases(),
   ]);
   const today = todayInIndia();
+  // listCases() returns disbursedPaise as a bigint; a bigint prop into a
+  // "use client" component throws in React production, so strip it down to
+  // plain strings before it crosses into ContributionForm.
+  const caseOptions = cases.map((c) => ({ id: c.id, title: c.title }));
 
   return (
     <div className="flex flex-col gap-8">
@@ -29,6 +35,7 @@ export default async function ContributionsPage() {
         <h2 className="pb-4 font-display text-lg font-semibold text-ink">Record a contribution</h2>
         <ContributionForm
           contributors={contributors}
+          cases={caseOptions}
           today={today}
           anonymousContributorId={ANONYMOUS_CONTRIBUTOR_ID}
         />
@@ -41,6 +48,7 @@ export default async function ContributionsPage() {
           { key: "date", header: "Date", cell: (c) => formatDate(c.receivedOn) },
           { key: "from", header: "From", cell: (c) => c.contributor.name },
           { key: "amount", header: "Amount", cell: (c) => <Money paise={c.amountPaise} compact /> },
+          { key: "cause", header: "Cause", cell: (c) => c.case?.title ?? "—" },
           { key: "receipt", header: "Receipt", cell: (c) => c.receiptNo ?? "—" },
           {
             key: "status",
@@ -63,6 +71,7 @@ export default async function ContributionsPage() {
               {formatDate(c.receivedOn)} · {c.mode}
               {c.status === "VOID" ? " · Voided" : ""}
             </span>
+            <span className="text-xs text-muted">Cause: {c.case?.title ?? "—"}</span>
             <span className="text-xs text-muted">{c.receiptNo ?? ""}</span>
             {c.status === "ACTIVE" ? (
               <div className="pt-1">

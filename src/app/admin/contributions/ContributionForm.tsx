@@ -9,10 +9,12 @@ import { addContributionAction, type ActionState } from "./actions";
 
 export function ContributionForm({
   contributors,
+  cases,
   today,
   anonymousContributorId,
 }: {
   contributors: { id: string; name: string }[];
+  cases: { id: string; title: string }[];
   today: string;
   anonymousContributorId: string;
 }) {
@@ -46,6 +48,17 @@ export function ContributionForm({
             </option>
           ))}
           <option value={anonymousContributorId}>Anonymous</option>
+        </select>
+      </Field>
+
+      <Field label="For a cause (optional)" htmlFor="caseId">
+        <select id="caseId" name="caseId" defaultValue="" className={inputClass}>
+          <option value="">General — not tied to a cause</option>
+          {cases.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.title}
+            </option>
+          ))}
         </select>
       </Field>
 

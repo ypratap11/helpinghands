@@ -111,6 +111,52 @@ describe("addContributionAction", () => {
     expect(await prisma.contribution.count()).toBe(0);
   });
 
+  it("ties the contribution to a case when caseId is present in the form", async () => {
+    const contributor = await prisma.contributor.create({ data: { name: "Asha" } });
+    const caseRecord = await prisma.case.create({
+      data: {
+        title: "Flood relief",
+        category: "DISASTER",
+        publicSummary: "Relief for flood-affected families.",
+        occurredOn: new Date(Date.UTC(2026, 7, 1)),
+      },
+    });
+
+    const result = await addContributionAction(
+      {},
+      form({
+        contributorId: contributor.id,
+        amount: "500",
+        receivedOn: "2026-08-28",
+        mode: "UPI",
+        caseId: caseRecord.id,
+      }),
+    );
+
+    expect(result.ok).toBe(true);
+    const saved = await prisma.contribution.findFirst();
+    expect(saved?.caseId).toBe(caseRecord.id);
+  });
+
+  it("succeeds as a general contribution when caseId is empty", async () => {
+    const contributor = await prisma.contributor.create({ data: { name: "Asha" } });
+
+    const result = await addContributionAction(
+      {},
+      form({
+        contributorId: contributor.id,
+        amount: "500",
+        receivedOn: "2026-08-28",
+        mode: "UPI",
+        caseId: "",
+      }),
+    );
+
+    expect(result.ok).toBe(true);
+    const saved = await prisma.contribution.findFirst();
+    expect(saved?.caseId).toBeNull();
+  });
+
   it("returns a friendly error for an amount above the postgres INT4 ceiling and writes nothing", async () => {
     const contributor = await prisma.contributor.create({ data: { name: "Asha" } });
 

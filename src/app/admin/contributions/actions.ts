@@ -48,6 +48,8 @@ export async function addContributionAction(
     throw error;
   }
 
+  const caseId = String(data.get("caseId") ?? "").trim() || null;
+
   try {
     await createContribution(
       {
@@ -57,6 +59,7 @@ export async function addContributionAction(
         mode,
         reference: (String(data.get("reference") ?? "").trim() || null) as string | null,
         note: (String(data.get("note") ?? "").trim() || null) as string | null,
+        caseId,
       },
       actor.id,
     );
