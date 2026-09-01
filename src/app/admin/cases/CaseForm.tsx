@@ -62,7 +62,7 @@ export function CaseForm({
     <form ref={formRef} action={formAction} className="flex flex-col gap-4">
       {caseRecord ? <input type="hidden" name="id" value={caseRecord.id} /> : null}
 
-      <Field label="Title" htmlFor="title">
+      <Field label="Cause name" htmlFor="title">
         <input
           id="title"
           name="title"
@@ -135,7 +135,7 @@ export function CaseForm({
         </Field>
       </div>
 
-      <Field label="Public summary (shown to everyone, keep it anonymous)" htmlFor="publicSummary">
+      <Field label="Description (shown on the public page)" htmlFor="publicSummary">
         <textarea
           id="publicSummary"
           name="publicSummary"
