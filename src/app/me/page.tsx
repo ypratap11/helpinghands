@@ -3,7 +3,7 @@ import { MemberShell } from "@/components/MemberShell";
 import { RecordList } from "@/components/RecordList";
 import { Money } from "@/components/ui/Money";
 import { listMyContributions, myYearlyTotals } from "@/lib/data/contributions";
-import { requireUser } from "@/lib/authz";
+import { requireUserOrRedirect } from "@/lib/authz";
 
 function formatDate(value: Date) {
   return value.toISOString().slice(0, 10).split("-").reverse().join("/");
@@ -11,7 +11,7 @@ function formatDate(value: Date) {
 
 export default async function MePage() {
   // Own-data only: every read below is scoped to this signed-in user's id.
-  const user = await requireUser();
+  const user = await requireUserOrRedirect();
   const [contributions, yearlyTotals] = await Promise.all([
     listMyContributions(user.id),
     myYearlyTotals(user.id),
