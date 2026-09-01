@@ -13,9 +13,14 @@ export const caseSchema = z.object({
   city: z.string().trim().optional().nullable(),
   state: z.string().trim().optional().nullable(),
   occurredOn: z.date(),
+  type: z.enum(["MONTHLY", "YEARLY", "ONCE"]).default("ONCE"),
+  status: z.enum(["ACTIVE", "CLOSED", "CANCELLED"]).default("ACTIVE"),
 });
 
-export type CaseInput = z.infer<typeof caseSchema>;
+// z.input (not z.infer/z.output) so that `type`/`status` — which carry a
+// `.default()` — are optional on the way in, matching createCase's actual
+// contract: callers may omit them and get ONCE/ACTIVE.
+export type CaseInput = z.input<typeof caseSchema>;
 export type CaseUpdateInput = Partial<CaseInput>;
 
 export const disbursementSchema = z.object({
@@ -51,7 +56,13 @@ export async function createCase(input: CaseInput, actorId: string | null) {
     action: "CREATE",
     entityType: "Case",
     entityId: created.id,
-    after: { title: created.title, category: created.category, occurredOn: created.occurredOn },
+    after: {
+      title: created.title,
+      category: created.category,
+      occurredOn: created.occurredOn,
+      type: created.type,
+      status: created.status,
+    },
   });
 
   return created;

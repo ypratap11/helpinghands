@@ -34,10 +34,15 @@ enum CaseCategory {
 }
 
 enum CaseStatus {
-  PROPOSED
-  APPROVED
-  DISBURSED
+  ACTIVE
   CLOSED
+  CANCELLED
+}
+
+enum CaseType {
+  MONTHLY
+  YEARLY
+  ONCE
 }
 
 enum AttachmentEntity {
@@ -161,7 +166,8 @@ model Case {
   city               String?
   state              String?
   occurredOn         DateTime     @db.Date
-  status             CaseStatus   @default(PROPOSED)
+  status             CaseStatus   @default(ACTIVE)
+  type               CaseType     @default(ONCE)
   isPublished        Boolean      @default(false)
   createdByUserId    String?
   createdAt          DateTime     @default(now())

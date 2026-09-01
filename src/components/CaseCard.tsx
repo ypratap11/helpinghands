@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Money } from "@/components/ui/Money";
 import { categoryLabel } from "@/lib/categories";
+import { caseStatusLabel, caseTypeLabel } from "@/lib/caseMeta";
 import type { PublicCase } from "@/lib/data/public";
 
 const monthYearFormatter = new Intl.DateTimeFormat("en-IN", {
@@ -25,9 +26,21 @@ export function CaseCard({ caseItem }: { caseItem: PublicCase }) {
       href={`/cases/${caseItem.id}`}
       className="group flex min-h-[44px] flex-col gap-4 rounded-2xl border border-line bg-surface p-5 lift transition-colors hover:border-forest/40"
     >
-      <span className="inline-flex w-fit items-center rounded-full bg-forest-soft px-3 py-1 text-xs font-semibold uppercase tracking-wide text-forest">
-        {categoryLabel(caseItem.category)}
-      </span>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="inline-flex w-fit items-center rounded-full bg-forest-soft px-3 py-1 text-xs font-semibold uppercase tracking-wide text-forest">
+          {categoryLabel(caseItem.category)}
+        </span>
+        {caseItem.status !== "ACTIVE" ? (
+          <span className="inline-flex w-fit items-center rounded-full border border-line px-2.5 py-1 text-xs font-semibold text-muted">
+            {caseStatusLabel(caseItem.status)}
+          </span>
+        ) : null}
+        {caseItem.type !== "ONCE" ? (
+          <span className="inline-flex w-fit items-center rounded-full bg-marigold-soft px-2.5 py-1 text-xs font-semibold text-marigold">
+            {caseTypeLabel(caseItem.type)}
+          </span>
+        ) : null}
+      </div>
       <p className="font-display text-lg font-medium leading-snug text-ink">
         {caseItem.publicSummary}
       </p>

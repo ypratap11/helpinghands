@@ -1,4 +1,4 @@
-import type { CaseCategory } from "@prisma/client";
+import type { CaseCategory, CaseStatus, CaseType } from "@prisma/client";
 import { prisma } from "@/lib/db";
 
 export type PublicImpact = {
@@ -15,14 +15,16 @@ export type PublicCase = {
   city: string | null;
   state: string | null;
   occurredOn: Date;
+  type: CaseType;
+  status: CaseStatus;
   disbursedPaise: bigint;
 };
 
 /**
  * The public fields of a Case — anonymised by construction. Every read in
  * this module selects exactly this shape and NEVER `include`s or selects
- * beneficiaryName, beneficiaryContact, privateNotes, status, or any other
- * private column.
+ * beneficiaryName, beneficiaryContact, or privateNotes. `type` and `status`
+ * ARE safe to expose publicly (they carry no beneficiary information).
  */
 const PUBLIC_CASE_SELECT = {
   id: true,
@@ -31,6 +33,8 @@ const PUBLIC_CASE_SELECT = {
   city: true,
   state: true,
   occurredOn: true,
+  type: true,
+  status: true,
 } as const;
 
 type PublicCaseRow = {
@@ -40,6 +44,8 @@ type PublicCaseRow = {
   city: string | null;
   state: string | null;
   occurredOn: Date;
+  type: CaseType;
+  status: CaseStatus;
 };
 
 async function disbursedTotalsFor(caseIds: string[]): Promise<Map<string, bigint>> {
@@ -60,6 +66,8 @@ function toPublicCase(row: PublicCaseRow, disbursedPaise: bigint): PublicCase {
     city: row.city,
     state: row.state,
     occurredOn: row.occurredOn,
+    type: row.type,
+    status: row.status,
     disbursedPaise,
   };
 }

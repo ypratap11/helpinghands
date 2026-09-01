@@ -3,6 +3,7 @@ import { RecordList } from "@/components/RecordList";
 import { Button } from "@/components/ui/Button";
 import { Money } from "@/components/ui/Money";
 import { CASE_CATEGORIES } from "@/lib/categories";
+import { CASE_STATUSES, CASE_TYPES } from "@/lib/caseMeta";
 import { caseDisbursedTotal, getCase } from "@/lib/data/cases";
 import { caseRaisedTotal, listCaseContributions } from "@/lib/data/contributions";
 import { todayInIndia } from "@/lib/fy";
@@ -50,7 +51,13 @@ export default async function EditCasePage({
 
       <section className="rounded-2xl border border-line bg-surface p-6 lift">
         <h2 className="pb-4 font-display text-lg font-semibold text-ink">Details</h2>
-        <CaseForm categories={CASE_CATEGORIES} today={today} caseRecord={caseRecord} />
+        <CaseForm
+          categories={CASE_CATEGORIES}
+          types={CASE_TYPES}
+          statuses={CASE_STATUSES}
+          today={today}
+          caseRecord={caseRecord}
+        />
       </section>
 
       <section className="rounded-2xl border border-line bg-surface p-6 lift">

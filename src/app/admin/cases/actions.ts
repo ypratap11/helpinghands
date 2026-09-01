@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { CASE_CATEGORIES } from "@/lib/categories";
+import { CASE_STATUSES, CASE_TYPES } from "@/lib/caseMeta";
 import { requireAdmin } from "@/lib/authz";
 import { createCase, createDisbursement, setCasePublished, updateCase } from "@/lib/data/cases";
 import { toDateOnly } from "@/lib/fy";
@@ -14,6 +15,12 @@ type Mode = (typeof MODES)[number];
 
 const CATEGORY_VALUES = CASE_CATEGORIES.map((c) => c.value);
 type CategoryValue = (typeof CATEGORY_VALUES)[number];
+
+const TYPE_VALUES = CASE_TYPES.map((t) => t.value);
+type TypeValue = (typeof TYPE_VALUES)[number];
+
+const STATUS_VALUES = CASE_STATUSES.map((s) => s.value);
+type StatusValue = (typeof STATUS_VALUES)[number];
 
 function field(data: FormData, name: string): string | null {
   const value = data.get(name);
@@ -57,6 +64,23 @@ export async function saveCaseAction(
 
   const id = field(data, "id");
 
+  // type/status are optional on the FormData: when present and valid they're
+  // included in `input`; when absent, the key is left off entirely. For a
+  // create that means caseSchema's `.default()` fills them in (ONCE/ACTIVE);
+  // for an edit, updateCase's non-destructive partial update then leaves the
+  // existing column value untouched instead of nulling it.
+  const typeRaw = field(data, "type");
+  if (typeRaw && !(TYPE_VALUES as readonly string[]).includes(typeRaw)) {
+    return { error: "Choose a valid type." };
+  }
+  const type = typeRaw as TypeValue | null;
+
+  const statusRaw = field(data, "status");
+  if (statusRaw && !(STATUS_VALUES as readonly string[]).includes(statusRaw)) {
+    return { error: "Choose a valid status." };
+  }
+  const status = statusRaw as StatusValue | null;
+
   const input = {
     title,
     category,
@@ -67,6 +91,8 @@ export async function saveCaseAction(
     city: field(data, "city"),
     state: field(data, "state"),
     occurredOn,
+    ...(type ? { type } : {}),
+    ...(status ? { status } : {}),
   };
 
   // Historical backfill: only on create (an id means this is an edit), and

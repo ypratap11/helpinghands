@@ -39,6 +39,8 @@ describe("listPublishedCases", () => {
     expect(pc.category).toBe("MEDICAL");
     expect(pc.publicSummary).toContain("Medical support");
     expect(pc.city).toBe("Hyderabad");
+    expect(pc.type).toBe("ONCE");
+    expect(pc.status).toBe("ACTIVE");
 
     // And CANNOT carry any of these — the whole point of the plan:
     const serialised = JSON.stringify(pc);
