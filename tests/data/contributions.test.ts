@@ -9,6 +9,7 @@ import {
   listCaseContributions,
   listContributions,
   listMyContributions,
+  myYearlyTotals,
   voidContribution,
 } from "@/lib/data/contributions";
 
@@ -466,5 +467,187 @@ describe("listMyContributions", () => {
     await voidContribution(created.id, null);
 
     expect(await listMyContributions(mine.id)).toEqual([]);
+  });
+
+  it("includes the tied case's id and title for an earmarked contribution", async () => {
+    const mine = await prisma.user.create({ data: { email: "asha@example.com" } });
+    const asha = await aContributor("Asha", "asha@example.com");
+    await prisma.contributor.update({ where: { id: asha.id }, data: { userId: mine.id } });
+    const caseRecord = await aCase({ title: "Flood relief" });
+
+    await createContribution(
+      {
+        contributorId: asha.id,
+        amountPaise: 100000,
+        receivedOn: new Date(Date.UTC(2026, 7, 28)),
+        mode: "UPI",
+        caseId: caseRecord.id,
+      },
+      null,
+    );
+
+    const [found] = await listMyContributions(mine.id);
+    expect(found.case).toEqual({ id: caseRecord.id, title: "Flood relief" });
+  });
+
+  it("returns a null case for a general contribution not tied to any cause", async () => {
+    const mine = await prisma.user.create({ data: { email: "asha@example.com" } });
+    const asha = await aContributor("Asha", "asha@example.com");
+    await prisma.contributor.update({ where: { id: asha.id }, data: { userId: mine.id } });
+
+    await createContribution(
+      {
+        contributorId: asha.id,
+        amountPaise: 100000,
+        receivedOn: new Date(Date.UTC(2026, 7, 28)),
+        mode: "UPI",
+      },
+      null,
+    );
+
+    const [found] = await listMyContributions(mine.id);
+    expect(found.case).toBeNull();
+  });
+});
+
+describe("myYearlyTotals", () => {
+  it("groups by Indian financial year, a 31-Mar and 1-Apr contribution landing in different years", async () => {
+    const mine = await prisma.user.create({ data: { email: "asha@example.com" } });
+    const asha = await aContributor("Asha", "asha@example.com");
+    await prisma.contributor.update({ where: { id: asha.id }, data: { userId: mine.id } });
+
+    await createContribution(
+      {
+        contributorId: asha.id,
+        amountPaise: 100000,
+        receivedOn: new Date(Date.UTC(2026, 2, 31)), // 31 Mar 2026 -> FY 2025-26
+        mode: "UPI",
+      },
+      null,
+    );
+    await createContribution(
+      {
+        contributorId: asha.id,
+        amountPaise: 200000,
+        receivedOn: new Date(Date.UTC(2026, 3, 1)), // 1 Apr 2026 -> FY 2026-27
+        mode: "UPI",
+      },
+      null,
+    );
+
+    const totals = await myYearlyTotals(mine.id);
+    expect(totals).toEqual([
+      { financialYear: "2026-27", totalPaise: 200000n, count: 1 },
+      { financialYear: "2025-26", totalPaise: 100000n, count: 1 },
+    ]);
+  });
+
+  it("sums multiple ACTIVE contributions within the same financial year and excludes voided ones", async () => {
+    const mine = await prisma.user.create({ data: { email: "asha@example.com" } });
+    const asha = await aContributor("Asha", "asha@example.com");
+    await prisma.contributor.update({ where: { id: asha.id }, data: { userId: mine.id } });
+
+    await createContribution(
+      {
+        contributorId: asha.id,
+        amountPaise: 100000,
+        receivedOn: new Date(Date.UTC(2026, 7, 1)),
+        mode: "UPI",
+      },
+      null,
+    );
+    await createContribution(
+      {
+        contributorId: asha.id,
+        amountPaise: 250000,
+        receivedOn: new Date(Date.UTC(2026, 7, 15)),
+        mode: "CASH",
+      },
+      null,
+    );
+    const voided = await createContribution(
+      {
+        contributorId: asha.id,
+        amountPaise: 900000,
+        receivedOn: new Date(Date.UTC(2026, 7, 20)),
+        mode: "CASH",
+      },
+      null,
+    );
+    await voidContribution(voided.id, null);
+
+    const totals = await myYearlyTotals(mine.id);
+    expect(totals).toEqual([{ financialYear: "2026-27", totalPaise: 350000n, count: 2 }]);
+  });
+
+  it("sorts financial years newest first", async () => {
+    const mine = await prisma.user.create({ data: { email: "asha@example.com" } });
+    const asha = await aContributor("Asha", "asha@example.com");
+    await prisma.contributor.update({ where: { id: asha.id }, data: { userId: mine.id } });
+
+    await createContribution(
+      {
+        contributorId: asha.id,
+        amountPaise: 100000,
+        receivedOn: new Date(Date.UTC(2024, 7, 1)), // FY 2024-25
+        mode: "UPI",
+      },
+      null,
+    );
+    await createContribution(
+      {
+        contributorId: asha.id,
+        amountPaise: 200000,
+        receivedOn: new Date(Date.UTC(2026, 7, 1)), // FY 2026-27
+        mode: "UPI",
+      },
+      null,
+    );
+    await createContribution(
+      {
+        contributorId: asha.id,
+        amountPaise: 300000,
+        receivedOn: new Date(Date.UTC(2025, 7, 1)), // FY 2025-26
+        mode: "UPI",
+      },
+      null,
+    );
+
+    const totals = await myYearlyTotals(mine.id);
+    expect(totals.map((t) => t.financialYear)).toEqual(["2026-27", "2025-26", "2024-25"]);
+  });
+
+  it("returns an empty array for a user with no linked contributions", async () => {
+    const stranger = await prisma.user.create({ data: { email: "nobody@example.com" } });
+    expect(await myYearlyTotals(stranger.id)).toEqual([]);
+  });
+
+  it("excludes other users' contributions from the totals", async () => {
+    const mine = await prisma.user.create({ data: { email: "asha@example.com" } });
+    const asha = await aContributor("Asha", "asha@example.com");
+    await prisma.contributor.update({ where: { id: asha.id }, data: { userId: mine.id } });
+    const ravi = await aContributor("Ravi", "ravi@example.com");
+
+    await createContribution(
+      {
+        contributorId: asha.id,
+        amountPaise: 100000,
+        receivedOn: new Date(Date.UTC(2026, 7, 1)),
+        mode: "UPI",
+      },
+      null,
+    );
+    await createContribution(
+      {
+        contributorId: ravi.id,
+        amountPaise: 900000,
+        receivedOn: new Date(Date.UTC(2026, 7, 1)),
+        mode: "UPI",
+      },
+      null,
+    );
+
+    const totals = await myYearlyTotals(mine.id);
+    expect(totals).toEqual([{ financialYear: "2026-27", totalPaise: 100000n, count: 1 }]);
   });
 });
