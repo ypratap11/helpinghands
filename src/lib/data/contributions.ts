@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { recordAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
-import { financialYearRange, toDateOnly } from "@/lib/fy";
+import { financialYearOf, financialYearRange, toDateOnly } from "@/lib/fy";
 import { allocateReceiptNo } from "@/lib/receipts";
 
 export const contributionSchema = z.object({
@@ -105,7 +105,35 @@ export async function listMyContributions(userId: string) {
   return prisma.contribution.findMany({
     where: { status: "ACTIVE", contributor: { userId } },
     orderBy: { receivedOn: "desc" },
+    include: { case: { select: { id: true, title: true } } },
   });
+}
+
+/**
+ * The member's own ACTIVE contributions, summed per Indian financial year,
+ * newest year first. Goes through the same "only my own data" filter as
+ * listMyContributions above.
+ */
+export async function myYearlyTotals(
+  userId: string,
+): Promise<{ financialYear: string; totalPaise: bigint; count: number }[]> {
+  const rows = await prisma.contribution.findMany({
+    where: { status: "ACTIVE", contributor: { userId } },
+    select: { amountPaise: true, receivedOn: true },
+  });
+
+  const byYear = new Map<string, { totalPaise: bigint; count: number }>();
+  for (const row of rows) {
+    const fy = financialYearOf(row.receivedOn);
+    const existing = byYear.get(fy) ?? { totalPaise: 0n, count: 0 };
+    existing.totalPaise += BigInt(row.amountPaise);
+    existing.count += 1;
+    byYear.set(fy, existing);
+  }
+
+  return Array.from(byYear.entries())
+    .map(([financialYear, totals]) => ({ financialYear, ...totals }))
+    .sort((a, b) => b.financialYear.localeCompare(a.financialYear));
 }
 
 export async function caseRaisedTotal(caseId: string): Promise<bigint> {
