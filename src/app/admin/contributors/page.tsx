@@ -20,12 +20,32 @@ export default async function ContributorsPage() {
           { key: "name", header: "Name", cell: (c) => <Link href={`/admin/contributors/${c.id}`} className="font-semibold text-forest hover:underline">{c.name}</Link> },
           { key: "email", header: "Email", cell: (c) => c.email ?? "—" },
           { key: "phone", header: "Phone", cell: (c) => c.phone ?? "—" },
+          {
+            key: "edit",
+            header: "",
+            cell: (c) => (
+              <Link
+                href={`/admin/contributors/${c.id}`}
+                className="inline-flex min-h-[44px] items-center rounded-xl border border-line px-3 text-sm font-medium text-forest hover:bg-forest-soft"
+              >
+                Edit
+              </Link>
+            ),
+          },
         ]}
         renderCard={(c) => (
-          <Link href={`/admin/contributors/${c.id}`} className="flex flex-col gap-1">
-            <span className="font-semibold text-ink">{c.name}</span>
-            <span className="text-sm text-muted">{c.email ?? c.phone ?? "No contact"}</span>
-          </Link>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex flex-col gap-1">
+              <span className="font-semibold text-ink">{c.name}</span>
+              <span className="text-sm text-muted">{c.email ?? c.phone ?? "No contact"}</span>
+            </div>
+            <Link
+              href={`/admin/contributors/${c.id}`}
+              className="inline-flex min-h-[44px] shrink-0 items-center rounded-xl border border-line px-3 text-sm font-medium text-forest hover:bg-forest-soft"
+            >
+              Edit
+            </Link>
+          </div>
         )}
       />
 

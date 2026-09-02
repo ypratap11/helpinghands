@@ -140,7 +140,7 @@ export default async function HomePage() {
       </main>
 
       <footer className="mx-auto w-full max-w-5xl px-6 pb-10 text-sm text-muted">
-        Helping Hands — kept honestly, in Asia/Kolkata time.
+        Helping Hands — Kept honestly.
       </footer>
     </div>
   );
