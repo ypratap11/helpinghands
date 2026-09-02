@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { prisma } from "@/lib/db";
-import { createCase, createDisbursement, setCasePublished } from "@/lib/data/cases";
+import { createCase, createDisbursement, setCasePublished, voidDisbursement } from "@/lib/data/cases";
 import { createContribution, voidContribution } from "@/lib/data/contributions";
 import { createContributor } from "@/lib/data/contributors";
 import { getPublishedCase, listPublishedCases, publicImpact } from "@/lib/data/public";
@@ -73,6 +73,21 @@ describe("listPublishedCases", () => {
     const pc = (await listPublishedCases())[0];
     expect(pc.disbursedPaise).toBe(1500000n);
   });
+
+  it("excludes a voided disbursement from a case's disbursed total", async () => {
+    const c = await aCase();
+    await setCasePublished(c.id, true, null);
+    const drop = await createDisbursement(
+      c.id,
+      { amountPaise: 1500000, paidOn: new Date(Date.UTC(2026, 5, 12)), mode: "BANK" },
+      null,
+    );
+
+    await voidDisbursement(drop.id, null);
+
+    const pc = (await listPublishedCases())[0];
+    expect(pc.disbursedPaise).toBe(0n);
+  });
 });
 
 describe("getPublishedCase", () => {
@@ -140,5 +155,29 @@ describe("publicImpact", () => {
 
     const impact = await publicImpact();
     expect(impact.contributorCount).toBe(2); // Asha + Ravi (distinct); Meena excluded (voided)
+  });
+
+  it("excludes a voided disbursement from disbursedPaise", async () => {
+    const c = await aCase();
+    await setCasePublished(c.id, true, null);
+    const keep = await createDisbursement(
+      c.id,
+      { amountPaise: 100000, paidOn: new Date(Date.UTC(2026, 5, 12)), mode: "BANK" },
+      null,
+    );
+    const drop = await createDisbursement(
+      c.id,
+      { amountPaise: 500000, paidOn: new Date(Date.UTC(2026, 5, 12)), mode: "BANK" },
+      null,
+    );
+
+    const before = await publicImpact();
+    expect(before.disbursedPaise).toBe(600000n);
+
+    await voidDisbursement(drop.id, null);
+
+    const after = await publicImpact();
+    expect(after.disbursedPaise).toBe(100000n);
+    expect(keep.amountPaise).toBe(100000);
   });
 });

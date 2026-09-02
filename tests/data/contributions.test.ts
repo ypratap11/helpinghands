@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { prisma } from "@/lib/db";
-import { createCase } from "@/lib/data/cases";
+import { createCase, createDisbursement, voidDisbursement } from "@/lib/data/cases";
 import { createContributor } from "@/lib/data/contributors";
 import {
   caseContributionCount,
@@ -221,6 +221,37 @@ describe("voidContribution", () => {
     const totals = await ledgerTotals();
     expect(totals.collectedPaise).toBe(100000n);
     expect(keep.status).toBe("ACTIVE");
+  });
+
+  it("excludes a voided disbursement from the ledger totals' disbursedPaise", async () => {
+    const caseRecord = await createCase(
+      {
+        title: "Flood relief",
+        category: "DISASTER",
+        publicSummary: "Relief for flood-affected families.",
+        occurredOn: new Date(Date.UTC(2026, 7, 1)),
+      },
+      null,
+    );
+    const keep = await createDisbursement(
+      caseRecord.id,
+      { amountPaise: 100000, paidOn: new Date(Date.UTC(2026, 7, 28)), mode: "CASH" },
+      null,
+    );
+    const drop = await createDisbursement(
+      caseRecord.id,
+      { amountPaise: 500000, paidOn: new Date(Date.UTC(2026, 7, 28)), mode: "CASH" },
+      null,
+    );
+
+    const before = await ledgerTotals();
+    expect(before.disbursedPaise).toBe(600000n);
+
+    await voidDisbursement(drop.id, null);
+
+    const after = await ledgerTotals();
+    expect(after.disbursedPaise).toBe(100000n);
+    expect(keep.amountPaise).toBe(100000);
   });
 
   it("writes a VOID audit row with the actor id", async () => {

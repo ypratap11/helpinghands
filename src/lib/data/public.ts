@@ -58,7 +58,7 @@ async function disbursedTotalsFor(caseIds: string[]): Promise<Map<string, bigint
   if (caseIds.length === 0) return new Map();
   const totals = await prisma.disbursement.groupBy({
     by: ["caseId"],
-    where: { caseId: { in: caseIds } },
+    where: { caseId: { in: caseIds }, status: "ACTIVE" },
     _sum: { amountPaise: true },
   });
   return new Map(totals.map((t) => [t.caseId, BigInt(t._sum.amountPaise ?? 0)]));
@@ -108,7 +108,10 @@ export async function publicImpact(): Promise<PublicImpact> {
       where: { status: "ACTIVE" },
       _sum: { amountPaise: true },
     }),
-    prisma.disbursement.aggregate({ _sum: { amountPaise: true } }),
+    prisma.disbursement.aggregate({
+      where: { status: "ACTIVE" },
+      _sum: { amountPaise: true },
+    }),
     prisma.case.count({ where: { isPublished: true } }),
     // Distinct people who have given (not the number of contribution records),
     // so the "Contributors" figure means what it says. A cause backfilled with

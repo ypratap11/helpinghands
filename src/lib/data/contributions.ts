@@ -162,7 +162,10 @@ export async function ledgerTotals() {
       where: { status: "ACTIVE" },
       _sum: { amountPaise: true },
     }),
-    prisma.disbursement.aggregate({ _sum: { amountPaise: true } }),
+    prisma.disbursement.aggregate({
+      where: { status: "ACTIVE" },
+      _sum: { amountPaise: true },
+    }),
   ]);
 
   const collectedPaise = BigInt(collected._sum.amountPaise ?? 0);
