@@ -1,7 +1,25 @@
-import { beforeEach } from "vitest";
+import { randomUUID } from "node:crypto";
+import { rm } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { afterAll, beforeEach } from "vitest";
 import { prisma } from "@/lib/db";
 
 export const ANONYMOUS_CONTRIBUTOR_ID = "anonymous";
+
+// Attachment tests (storage.ts, data/attachments.ts, the upload/delete
+// actions) write real files to STORAGE_LOCAL_PATH. .env.test does not set
+// it, and storage.ts's own default ("./storage/uploads" under process.cwd())
+// would otherwise point straight at the checked-out repo's storage/ dir.
+// Point every test run at a fresh temp directory instead, and remove it
+// once the whole suite finishes, so tests never leave stray files behind.
+const TEST_STORAGE_DIR = path.join(os.tmpdir(), `hh-test-storage-${randomUUID()}`);
+process.env.STORAGE_LOCAL_PATH = TEST_STORAGE_DIR;
+process.env.STORAGE_DRIVER = process.env.STORAGE_DRIVER || "local";
+
+afterAll(async () => {
+  await rm(TEST_STORAGE_DIR, { recursive: true, force: true });
+});
 
 // JSON.stringify throws a TypeError on any object containing a BigInt
 // (a JS platform limitation, not a bug in the data layer). Several money

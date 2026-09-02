@@ -85,6 +85,16 @@ ENV HOSTNAME=0.0.0.0
 RUN addgroup --system --gid 1001 nodejs \
     && adduser --system --uid 1001 nextjs
 
+# Pre-create the attachment storage directory (STORAGE_LOCAL_PATH resolves
+# to /app/storage/uploads at runtime; see src/lib/storage.ts) and own it as
+# `nextjs` *before* docker-compose.prod.yml's named `uploads` volume is
+# first mounted here. A named volume with no prior data is seeded from
+# whatever already exists at its mount path in the image, ownership
+# included - without this, Docker would create the mount point as root on
+# first run, and the non-root `nextjs` user (see USER below) would never be
+# able to write an uploaded file.
+RUN mkdir -p /app/storage/uploads && chown -R nextjs:nodejs /app/storage
+
 # Next.js standalone server + traced runtime node_modules (includes next,
 # react, pg, sharp, and - per verification - the generated Prisma client).
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./

@@ -1,9 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { prisma } from "@/lib/db";
+import { createAttachment } from "@/lib/data/attachments";
 import { createCase, createDisbursement, setCasePublished, voidDisbursement } from "@/lib/data/cases";
 import { createContribution, voidContribution } from "@/lib/data/contributions";
 import { createContributor } from "@/lib/data/contributors";
-import { getPublishedCase, listPublishedCases, publicImpact } from "@/lib/data/public";
+import { getPublishedCase, listPublicCaseImages, listPublishedCases, publicImpact } from "@/lib/data/public";
+
+const PNG_BYTES = Buffer.from([
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0, 0, 0, 0, 0,
+]);
+const PDF_BYTES = Buffer.from([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x34, 0, 0, 0, 0]);
 
 async function aContributor(name = "Asha") {
   return createContributor({ name, email: null }, null);
@@ -179,5 +185,28 @@ describe("publicImpact", () => {
     const after = await publicImpact();
     expect(after.disbursedPaise).toBe(100000n);
     expect(keep.amountPaise).toBe(100000);
+  });
+});
+
+describe("listPublicCaseImages", () => {
+  it("returns only public image attachments for a published case", async () => {
+    const admin = await prisma.user.create({ data: { email: "admin@example.com", role: "ADMIN" } });
+    const c = await aCase();
+    await setCasePublished(c.id, true, null);
+
+    await createAttachment({ entityType: "CASE", entityId: c.id, isPublic: true }, PNG_BYTES, "cover.png", admin.id);
+    await createAttachment({ entityType: "CASE", entityId: c.id, isPublic: false }, PNG_BYTES, "private.png", admin.id);
+    await createAttachment({ entityType: "CASE", entityId: c.id, isPublic: true }, PDF_BYTES, "receipt.pdf", admin.id);
+
+    const images = await listPublicCaseImages(c.id);
+    expect(images).toHaveLength(1);
+    expect(images[0].filename).toBe("cover.png");
+    expect(images[0].mimeType).toBe("image/png");
+  });
+
+  it("returns nothing for a case with no attachments", async () => {
+    const c = await aCase();
+    await setCasePublished(c.id, true, null);
+    expect(await listPublicCaseImages(c.id)).toEqual([]);
   });
 });
