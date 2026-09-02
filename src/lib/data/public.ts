@@ -6,6 +6,7 @@ export type PublicImpact = {
   disbursedPaise: bigint;
   balancePaise: bigint | null;
   peopleHelped: number;
+  contributionCount: number;
 };
 
 export type PublicCase = {
@@ -96,13 +97,14 @@ export async function getPublishedCase(id: string): Promise<PublicCase | null> {
 }
 
 export async function publicImpact(): Promise<PublicImpact> {
-  const [collected, disbursed, peopleHelped, settings] = await Promise.all([
+  const [collected, disbursed, peopleHelped, contributionCount, settings] = await Promise.all([
     prisma.contribution.aggregate({
       where: { status: "ACTIVE" },
       _sum: { amountPaise: true },
     }),
     prisma.disbursement.aggregate({ _sum: { amountPaise: true } }),
     prisma.case.count({ where: { isPublished: true } }),
+    prisma.contribution.count({ where: { status: "ACTIVE" } }),
     prisma.orgSettings.findUniqueOrThrow({ where: { id: "singleton" } }),
   ]);
 
@@ -114,5 +116,6 @@ export async function publicImpact(): Promise<PublicImpact> {
     disbursedPaise,
     balancePaise: settings.showBalancePublicly ? raisedPaise - disbursedPaise : null,
     peopleHelped,
+    contributionCount,
   };
 }

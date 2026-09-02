@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { createCase } from "@/lib/data/cases";
 import { createContributor } from "@/lib/data/contributors";
 import {
+  caseContributionCount,
   caseRaisedTotal,
   createContribution,
   ledgerTotals,
@@ -353,6 +354,62 @@ describe("caseRaisedTotal", () => {
   it("returns zero for a case with no earmarked contributions", async () => {
     const caseRecord = await aCase();
     expect(await caseRaisedTotal(caseRecord.id)).toBe(0n);
+  });
+});
+
+describe("caseContributionCount", () => {
+  it("counts only ACTIVE contributions earmarked for that case", async () => {
+    const contributor = await aContributor();
+    const caseRecord = await aCase();
+    const otherCase = await aCase({ title: "Other cause" });
+
+    await createContribution(
+      {
+        contributorId: contributor.id,
+        amountPaise: 100000,
+        receivedOn: new Date(Date.UTC(2026, 7, 28)),
+        mode: "CASH",
+        caseId: caseRecord.id,
+      },
+      null,
+    );
+    const voided = await createContribution(
+      {
+        contributorId: contributor.id,
+        amountPaise: 500000,
+        receivedOn: new Date(Date.UTC(2026, 7, 28)),
+        mode: "CASH",
+        caseId: caseRecord.id,
+      },
+      null,
+    );
+    await voidContribution(voided.id, null);
+    await createContribution(
+      {
+        contributorId: contributor.id,
+        amountPaise: 900000,
+        receivedOn: new Date(Date.UTC(2026, 7, 28)),
+        mode: "CASH",
+        caseId: otherCase.id,
+      },
+      null,
+    );
+    await createContribution(
+      {
+        contributorId: contributor.id,
+        amountPaise: 700000,
+        receivedOn: new Date(Date.UTC(2026, 7, 28)),
+        mode: "CASH",
+      },
+      null,
+    );
+
+    expect(await caseContributionCount(caseRecord.id)).toBe(1);
+  });
+
+  it("returns zero for a case with no earmarked contributions", async () => {
+    const caseRecord = await aCase();
+    expect(await caseContributionCount(caseRecord.id)).toBe(0);
   });
 });
 

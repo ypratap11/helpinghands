@@ -18,6 +18,10 @@ export default async function HomePage() {
       label: "People helped",
       node: <span className="nums">{impact.peopleHelped.toLocaleString("en-IN")}</span>,
     },
+    {
+      label: "Contributions",
+      node: <span className="nums">{impact.contributionCount.toLocaleString("en-IN")}</span>,
+    },
   ];
   if (impact.balancePaise !== null) {
     stats.push({ label: "In hand", node: <Money paise={impact.balancePaise} compact /> });
@@ -66,11 +70,7 @@ export default async function HomePage() {
         {/* Live impact band */}
         <section className="rise" style={{ animationDelay: "260ms" }}>
           {hasImpact ? (
-            <div
-              className={`grid gap-px overflow-hidden rounded-2xl border border-line bg-line lift ${
-                stats.length === 4 ? "sm:grid-cols-4" : "sm:grid-cols-3"
-              }`}
-            >
+            <div className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-line bg-line lift sm:grid-cols-4">
               {stats.map((s) => (
                 <div key={s.label} className="bg-surface px-6 py-7 text-center sm:text-left">
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted">{s.label}</p>
