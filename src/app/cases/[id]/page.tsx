@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Wordmark } from "@/components/BrandMark";
 import { Money } from "@/components/ui/Money";
 import { categoryLabel } from "@/lib/categories";
+import { caseStatusLabel, caseTypeLabel } from "@/lib/caseMeta";
 import { getPublishedCase } from "@/lib/data/public";
 
 const monthYearFormatter = new Intl.DateTimeFormat("en-IN", {
@@ -46,9 +47,21 @@ export default async function PublicCasePage({
         </Link>
 
         <article className="rise rounded-3xl border border-line bg-surface p-7 lift sm:p-10">
-          <span className="inline-flex w-fit items-center rounded-full bg-forest-soft px-3 py-1 text-xs font-semibold uppercase tracking-wide text-forest">
-            {categoryLabel(caseItem.category)}
-          </span>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="inline-flex w-fit items-center rounded-full bg-forest-soft px-3 py-1 text-xs font-semibold uppercase tracking-wide text-forest">
+              {categoryLabel(caseItem.category)}
+            </span>
+            {caseItem.status !== "ACTIVE" ? (
+              <span className="inline-flex w-fit items-center rounded-full border border-line px-2.5 py-1 text-xs font-semibold text-muted">
+                {caseStatusLabel(caseItem.status)}
+              </span>
+            ) : null}
+            {caseItem.type !== "ONCE" ? (
+              <span className="inline-flex w-fit items-center rounded-full bg-marigold-soft px-2.5 py-1 text-xs font-semibold text-marigold">
+                {caseTypeLabel(caseItem.type)}
+              </span>
+            ) : null}
+          </div>
           <p className="mt-5 font-display text-2xl font-medium leading-snug text-ink sm:text-3xl">
             {caseItem.publicSummary}
           </p>

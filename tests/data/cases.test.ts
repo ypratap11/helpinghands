@@ -53,6 +53,18 @@ describe("createCase", () => {
     expect(audit?.userId).toBe(actor.id);
   });
 
+  it("defaults type to ONCE and status to ACTIVE when omitted", async () => {
+    const created = await aCase();
+    expect(created.type).toBe("ONCE");
+    expect(created.status).toBe("ACTIVE");
+  });
+
+  it("persists an explicit type and status", async () => {
+    const created = await aCase({ type: "MONTHLY", status: "CLOSED" });
+    expect(created.type).toBe("MONTHLY");
+    expect(created.status).toBe("CLOSED");
+  });
+
   it("rejects an empty title", async () => {
     await expect(
       createCase(
@@ -111,6 +123,29 @@ describe("updateCase", () => {
 
     const after = await prisma.case.findUnique({ where: { id: created.id } });
     expect(after?.privateNotes).toBeNull();
+  });
+
+  it("changes type and status when provided", async () => {
+    const created = await aCase();
+    expect(created.type).toBe("ONCE");
+    expect(created.status).toBe("ACTIVE");
+
+    await updateCase(created.id, { type: "YEARLY", status: "CANCELLED" }, null);
+
+    const after = await prisma.case.findUnique({ where: { id: created.id } });
+    expect(after?.type).toBe("YEARLY");
+    expect(after?.status).toBe("CANCELLED");
+  });
+
+  it("leaves type and status intact when the update omits them", async () => {
+    const created = await aCase({ type: "MONTHLY", status: "CLOSED" });
+
+    await updateCase(created.id, { title: "New title" }, null);
+
+    const after = await prisma.case.findUnique({ where: { id: created.id } });
+    expect(after?.title).toBe("New title");
+    expect(after?.type).toBe("MONTHLY");
+    expect(after?.status).toBe("CLOSED");
   });
 });
 
@@ -251,6 +286,8 @@ describe("getCase", () => {
     expect(found?.beneficiaryName).toBe("Ganesh Rao");
     expect(found?.privateNotes).toBe("Verified via local hospital.");
     expect(found?.disbursements).toHaveLength(1);
+    expect(found?.type).toBe("ONCE");
+    expect(found?.status).toBe("ACTIVE");
   });
 
   it("returns null for an unknown id", async () => {

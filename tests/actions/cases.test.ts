@@ -48,6 +48,27 @@ describe("saveCaseAction", () => {
     const saved = await prisma.case.findFirst();
     expect(saved?.title).toBe("Hospital bill for a daily-wage worker");
     expect(saved?.category).toBe("MEDICAL");
+    expect(saved?.type).toBe("ONCE");
+    expect(saved?.status).toBe("ACTIVE");
+  });
+
+  it("persists an explicit type and status from FormData", async () => {
+    const result = await saveCaseAction(
+      {},
+      form({
+        title: "Yearly scholarship support",
+        category: "EDUCATION",
+        publicSummary: "Yearly school fee support for a student.",
+        occurredOn: "2026-08-28",
+        type: "YEARLY",
+        status: "CLOSED",
+      }),
+    );
+
+    expect(result.ok).toBe(true);
+    const saved = await prisma.case.findFirst({ where: { title: "Yearly scholarship support" } });
+    expect(saved?.type).toBe("YEARLY");
+    expect(saved?.status).toBe("CLOSED");
   });
 
   it("refuses a non-admin and writes nothing", async () => {
@@ -121,6 +142,37 @@ describe("saveCaseAction", () => {
     expect(result.ok).toBe(true);
     const after = await prisma.case.findUnique({ where: { id: created.id } });
     expect(after?.title).toBe("Updated title");
+  });
+
+  it("updates type and status when an id is supplied", async () => {
+    const created = await prisma.case.create({
+      data: {
+        title: "Original title",
+        category: "MEDICAL",
+        publicSummary: "Original summary.",
+        occurredOn: new Date(Date.UTC(2026, 5, 10)),
+      },
+    });
+    expect(created.type).toBe("ONCE");
+    expect(created.status).toBe("ACTIVE");
+
+    const result = await saveCaseAction(
+      {},
+      form({
+        id: created.id,
+        title: "Original title",
+        category: "MEDICAL",
+        publicSummary: "Original summary.",
+        occurredOn: "2026-06-10",
+        type: "MONTHLY",
+        status: "CANCELLED",
+      }),
+    );
+
+    expect(result.ok).toBe(true);
+    const after = await prisma.case.findUnique({ where: { id: created.id } });
+    expect(after?.type).toBe("MONTHLY");
+    expect(after?.status).toBe("CANCELLED");
   });
 
   describe("historical backfill", () => {

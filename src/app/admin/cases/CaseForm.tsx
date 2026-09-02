@@ -7,6 +7,7 @@ import { todayInIndia } from "@/lib/fy";
 import { saveCaseAction, type ActionState } from "./actions";
 
 type Category = { value: string; label: string };
+type Option = { value: string; label: string };
 
 type Case = {
   id: string;
@@ -19,6 +20,8 @@ type Case = {
   city: string | null;
   state: string | null;
   occurredOn: Date;
+  type: string;
+  status: string;
 };
 
 function dateInputValue(value: Date): string {
@@ -27,10 +30,14 @@ function dateInputValue(value: Date): string {
 
 export function CaseForm({
   categories,
+  types,
+  statuses,
   today,
   caseRecord,
 }: {
   categories: Category[];
+  types: Option[];
+  statuses: Option[];
   today: string;
   caseRecord?: Case;
 }) {
@@ -55,7 +62,7 @@ export function CaseForm({
     <form ref={formRef} action={formAction} className="flex flex-col gap-4">
       {caseRecord ? <input type="hidden" name="id" value={caseRecord.id} /> : null}
 
-      <Field label="Title" htmlFor="title">
+      <Field label="Cause name" htmlFor="title">
         <input
           id="title"
           name="title"
@@ -96,9 +103,39 @@ export function CaseForm({
             className={inputClass}
           />
         </Field>
+
+        <Field label="Type" htmlFor="type">
+          <select
+            id="type"
+            name="type"
+            defaultValue={caseRecord?.type ?? "ONCE"}
+            className={inputClass}
+          >
+            {types.map((t) => (
+              <option key={t.value} value={t.value}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+        </Field>
+
+        <Field label="Status" htmlFor="status">
+          <select
+            id="status"
+            name="status"
+            defaultValue={caseRecord?.status ?? "ACTIVE"}
+            className={inputClass}
+          >
+            {statuses.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+        </Field>
       </div>
 
-      <Field label="Public summary (shown to everyone, keep it anonymous)" htmlFor="publicSummary">
+      <Field label="Description (shown on the public page)" htmlFor="publicSummary">
         <textarea
           id="publicSummary"
           name="publicSummary"
