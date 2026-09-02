@@ -5,6 +5,8 @@ import { CASE_CATEGORIES } from "@/lib/categories";
 import { CASE_STATUSES, CASE_TYPES } from "@/lib/caseMeta";
 import { requireAdmin } from "@/lib/authz";
 import { createCase, createDisbursement, setCasePublished, updateCase } from "@/lib/data/cases";
+import { createContribution } from "@/lib/data/contributions";
+import { ANONYMOUS_CONTRIBUTOR_ID } from "@/lib/data/contributors";
 import { toDateOnly } from "@/lib/fy";
 import { AmountTooLargeError, InvalidAmountError, parseRupeesToPaise } from "@/lib/money";
 
@@ -113,11 +115,43 @@ export async function saveCaseAction(
     }
   }
 
+  // Historical backfill: same create-only rule, for the parallel "total
+  // raised so far" field. Recorded as a single Anonymous contribution tied
+  // to the case rather than itemising past donors.
+  const historicalRaisedRaw = field(data, "historicalRaised");
+  let historicalRaisedPaise: number | null = null;
+  if (!id && historicalRaisedRaw) {
+    try {
+      historicalRaisedPaise = parseRupeesToPaise(historicalRaisedRaw);
+    } catch (error) {
+      if (error instanceof AmountTooLargeError) {
+        return { error: "That amount is too large to record. Please double-check it." };
+      }
+      if (error instanceof InvalidAmountError) {
+        return { error: "Enter a valid amount raised, such as 50000." };
+      }
+      throw error;
+    }
+  }
+
   try {
     if (id) {
       await updateCase(id, input, actor.id);
     } else {
       const created = await createCase(input, actor.id);
+      if (historicalRaisedPaise !== null) {
+        await createContribution(
+          {
+            contributorId: ANONYMOUS_CONTRIBUTOR_ID,
+            amountPaise: historicalRaisedPaise,
+            receivedOn: occurredOn,
+            mode: "OTHER",
+            caseId: created.id,
+            note: "Recorded as a past total (raised)",
+          },
+          actor.id,
+        );
+      }
       if (historicalAmountPaise !== null) {
         await createDisbursement(
           created.id,

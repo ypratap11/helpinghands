@@ -245,6 +245,114 @@ describe("saveCaseAction", () => {
       const disbursements = await prisma.disbursement.findMany({ where: { caseId: created.id } });
       expect(disbursements).toHaveLength(0);
     });
+
+    it('records exactly one Anonymous contribution of 5600000 paise tied to the new case when "Total raised so far" is "56,000"', async () => {
+      const result = await saveCaseAction(
+        {},
+        form({
+          title: "Past cause with a raised total",
+          category: "FOOD",
+          publicSummary: "Food support pooled before this system existed.",
+          occurredOn: "2025-03-15",
+          historicalRaised: "56,000",
+        }),
+      );
+
+      expect(result.ok).toBe(true);
+      const saved = await prisma.case.findFirst({ where: { title: "Past cause with a raised total" } });
+      expect(saved).not.toBeNull();
+
+      const contributions = await prisma.contribution.findMany({ where: { caseId: saved!.id } });
+      expect(contributions).toHaveLength(1);
+      expect(contributions[0].amountPaise).toBe(5600000);
+      expect(contributions[0].receivedOn.toISOString()).toBe("2025-03-15T00:00:00.000Z");
+      expect(contributions[0].mode).toBe("OTHER");
+      expect(contributions[0].contributorId).toBe("anonymous");
+      expect(contributions[0].status).toBe("ACTIVE");
+      expect(contributions[0].note).toBe("Recorded as a past total (raised)");
+
+      const raisedTotal = await prisma.contribution.aggregate({
+        where: { caseId: saved!.id, status: "ACTIVE" },
+        _sum: { amountPaise: true },
+      });
+      expect(raisedTotal._sum.amountPaise).toBe(5600000);
+    });
+
+    it("records both a contribution and a disbursement when historicalRaised and historicalTotal are both supplied", async () => {
+      const result = await saveCaseAction(
+        {},
+        form({
+          title: "Past cause with both raised and given",
+          category: "FOOD",
+          publicSummary: "Food support fully backfilled.",
+          occurredOn: "2025-03-15",
+          historicalRaised: "60,000",
+          historicalTotal: "50,000",
+        }),
+      );
+
+      expect(result.ok).toBe(true);
+      const saved = await prisma.case.findFirst({
+        where: { title: "Past cause with both raised and given" },
+      });
+      expect(saved).not.toBeNull();
+
+      const contributions = await prisma.contribution.findMany({ where: { caseId: saved!.id } });
+      expect(contributions).toHaveLength(1);
+      expect(contributions[0].amountPaise).toBe(6000000);
+
+      const disbursements = await prisma.disbursement.findMany({ where: { caseId: saved!.id } });
+      expect(disbursements).toHaveLength(1);
+      expect(disbursements[0].amountPaise).toBe(5000000);
+    });
+
+    it("creates zero contributions and zero disbursements when neither historical field is supplied", async () => {
+      const result = await saveCaseAction(
+        {},
+        form({
+          title: "Brand new cause, no history",
+          category: "FOOD",
+          publicSummary: "Nothing to backfill here.",
+          occurredOn: "2026-08-28",
+        }),
+      );
+
+      expect(result.ok).toBe(true);
+      const saved = await prisma.case.findFirst({ where: { title: "Brand new cause, no history" } });
+      expect(saved).not.toBeNull();
+
+      const contributions = await prisma.contribution.findMany({ where: { caseId: saved!.id } });
+      expect(contributions).toHaveLength(0);
+      const disbursements = await prisma.disbursement.findMany({ where: { caseId: saved!.id } });
+      expect(disbursements).toHaveLength(0);
+    });
+
+    it("does not re-trigger on edit even if historicalRaised is supplied", async () => {
+      const created = await prisma.case.create({
+        data: {
+          title: "Existing case for raised guard",
+          category: "MEDICAL",
+          publicSummary: "Existing summary.",
+          occurredOn: new Date(Date.UTC(2026, 5, 10)),
+        },
+      });
+
+      const result = await saveCaseAction(
+        {},
+        form({
+          id: created.id,
+          title: "Existing case for raised guard",
+          category: "MEDICAL",
+          publicSummary: "Existing summary.",
+          occurredOn: "2026-06-10",
+          historicalRaised: "10,000",
+        }),
+      );
+
+      expect(result.ok).toBe(true);
+      const contributions = await prisma.contribution.findMany({ where: { caseId: created.id } });
+      expect(contributions).toHaveLength(0);
+    });
   });
 });
 
