@@ -46,6 +46,7 @@ export async function GET(
     status: 200,
     headers: {
       "Content-Type": attachment.mimeType,
+      "X-Content-Type-Options": "nosniff",
       "Content-Disposition": `inline; filename="${escapeFilenameForHeader(attachment.filename)}"`,
       // Private attachments (admin-only) must never be cached by a shared
       // cache; public ones (a published cause's photo) can be cached

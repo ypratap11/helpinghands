@@ -81,11 +81,11 @@ describe("storage (local driver)", () => {
     await expect(deleteFile("../../etc/passwd")).rejects.toThrow();
   });
 
-  it("does not throw when deleting a key that never existed (idempotent-ish) or throws a clear error", async () => {
-    // Either behaviour is acceptable as long as it's not a silent path
-    // traversal; we just assert it doesn't crash the process unexpectedly
-    // by throwing something other than a normal Error.
+  it("is idempotent: deleting a key that never existed does not throw", async () => {
+    // deleteFile uses rm(force:true) so an already-absent file is treated as a
+    // successful delete — this is what stops a missing file from orphaning the
+    // DB row it backs when an attachment is removed.
     await mkdir(testDir, { recursive: true });
-    await expect(deleteFile("00000000-0000-0000-0000-000000000000.png")).rejects.toThrow();
+    await expect(deleteFile("00000000-0000-0000-0000-000000000000.png")).resolves.toBeUndefined();
   });
 });

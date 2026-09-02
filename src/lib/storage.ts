@@ -83,7 +83,9 @@ const localDriver: StorageDriver = {
 
   async delete(storageKey: string): Promise<void> {
     const target = resolveInsideBase(localBaseDir(), storageKey);
-    await rm(target, { force: false });
+    // force: a missing file must not orphan the DB row it backs — treat an
+    // already-absent file as a successful delete.
+    await rm(target, { force: true });
   },
 };
 
