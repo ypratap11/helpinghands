@@ -31,6 +31,17 @@ services:
       - .env.production
     expose:
       - "3000"
+    volumes:
+      # Attachment uploads (cause photos, transfer-proof screenshots) are
+      # written under STORAGE_LOCAL_PATH, which resolves at runtime to
+      # /app/storage/uploads (process.cwd() is /app inside this image; see
+      # src/lib/storage.ts). Without a volume here, every uploaded file
+      # lives only in the container's writable layer and is lost on the
+      # next `docker compose up --build` / container recreate. The
+      # Dockerfile pre-creates and chowns this same path to the `nextjs`
+      # user before a fresh named volume is first mounted here, so Docker
+      # seeds the new volume with correct ownership.
+      - uploads:/app/storage/uploads
     healthcheck:
       # Deliberately hits "/" rather than an /api/auth/* route: Auth.js
       # rejects requests whose Host header doesn't match NEXTAUTH_URL, and
@@ -62,3 +73,4 @@ volumes:
   dbdata:
   caddy_data:
   caddy_config:
+  uploads:

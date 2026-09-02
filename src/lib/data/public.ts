@@ -1,4 +1,5 @@
 import type { CaseCategory, CaseStatus, CaseType } from "@prisma/client";
+import { listAttachments } from "@/lib/data/attachments";
 import { prisma } from "@/lib/db";
 
 export type PublicImpact = {
@@ -100,6 +101,25 @@ export async function getPublishedCase(id: string): Promise<PublicCase | null> {
 
   const totals = await disbursedTotalsFor([row.id]);
   return toPublicCase(row, totals.get(row.id) ?? 0n);
+}
+
+export type PublicAttachment = { id: string; filename: string; mimeType: string };
+
+/**
+ * Public image attachments for a cause's public page. Intended to be
+ * called only for a case already confirmed published (e.g. right after
+ * getPublishedCase() returns non-null) -- it does not re-check
+ * isPublished itself, only entityType CASE + isPublic true, mirroring
+ * isAttachmentPubliclyServable's rule for a CASE attachment. Filters to
+ * image mime types only, since this is used to render `<img>` thumbnails,
+ * not a generic file list; a public PDF (if ever needed) would need its
+ * own link-based rendering, not this list.
+ */
+export async function listPublicCaseImages(caseId: string): Promise<PublicAttachment[]> {
+  const attachments = await listAttachments("CASE", caseId);
+  return attachments
+    .filter((a) => a.isPublic && a.mimeType.startsWith("image/"))
+    .map((a) => ({ id: a.id, filename: a.filename, mimeType: a.mimeType }));
 }
 
 export async function publicImpact(): Promise<PublicImpact> {

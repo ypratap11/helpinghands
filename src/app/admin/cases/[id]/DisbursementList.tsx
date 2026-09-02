@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { Money } from "@/components/ui/Money";
+import { AttachmentGallery, type AttachmentRowData } from "./AttachmentGallery";
+import { AttachmentUploadForm } from "./AttachmentUploadForm";
 import { DisbursementEditForm, type EditableDisbursement } from "./DisbursementEditForm";
 import { VoidButton } from "./VoidButton";
 import { voidDisbursementAction } from "./actions";
@@ -17,6 +19,7 @@ export type DisbursementRowData = {
   reference: string | null;
   note: string | null;
   status: "ACTIVE" | "VOID";
+  attachments: AttachmentRowData[];
 };
 
 function toEditable(d: DisbursementRowData): EditableDisbursement {
@@ -36,6 +39,30 @@ const VOIDED_BADGE =
   "inline-flex w-fit items-center rounded-full bg-[color-mix(in_srgb,var(--color-danger)_10%,white)] px-2.5 py-0.5 text-xs font-semibold text-danger";
 
 /**
+ * A disbursement's transfer-proof attachments -- upload plus existing
+ * files. Always private (entityType DISBURSEMENT is never publicly
+ * servable, enforced independently in the data layer and the serving
+ * route), so no public-visibility toggle here.
+ */
+function ProofPanel({ disbursement }: { disbursement: DisbursementRowData }) {
+  return (
+    <div className="flex flex-col gap-3">
+      <AttachmentUploadForm
+        entityType="DISBURSEMENT"
+        entityId={disbursement.id}
+        caseId={disbursement.caseId}
+        label="Attach proof"
+      />
+      <AttachmentGallery
+        attachments={disbursement.attachments}
+        caseId={disbursement.caseId}
+        emptyLabel="No proof attached yet."
+      />
+    </div>
+  );
+}
+
+/**
  * Cards-below-sm / table-at-sm-and-up list of a case's disbursements, each
  * with its own Edit / two-tap Void controls (ACTIVE only — a VOID row
  * renders greyed with neither). Not built on the shared RecordList
@@ -46,6 +73,7 @@ const VOIDED_BADGE =
  */
 export function DisbursementList({ disbursements }: { disbursements: DisbursementRowData[] }) {
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [proofOpenId, setProofOpenId] = useState<string | null>(null);
 
   if (disbursements.length === 0) {
     return (
@@ -85,6 +113,13 @@ export function DisbursementList({ disbursements }: { disbursements: Disbursemen
                     >
                       Edit
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => setProofOpenId(proofOpenId === d.id ? null : d.id)}
+                      className="inline-flex min-h-[44px] items-center text-sm font-medium text-forest underline"
+                    >
+                      Proof{d.attachments.length > 0 ? ` (${d.attachments.length})` : ""}
+                    </button>
                     <VoidButton
                       id={d.id}
                       caseId={d.caseId}
@@ -96,6 +131,7 @@ export function DisbursementList({ disbursements }: { disbursements: Disbursemen
                 ) : (
                   <span className={`${VOIDED_BADGE} mt-1`}>Voided</span>
                 )}
+                {proofOpenId === d.id ? <ProofPanel disbursement={d} /> : null}
               </div>
             )}
           </li>
@@ -117,50 +153,65 @@ export function DisbursementList({ disbursements }: { disbursements: Disbursemen
             </tr>
           </thead>
           <tbody>
-            {disbursements.map((d) =>
-              editingId === d.id ? (
-                <tr key={d.id} className="border-b border-line/70 last:border-0">
-                  <td colSpan={6} className="px-4 py-4">
-                    <DisbursementEditForm
-                      disbursement={toEditable(d)}
-                      onCancel={() => setEditingId(null)}
-                      onSaved={() => setEditingId(null)}
-                    />
-                  </td>
-                </tr>
-              ) : (
-                <tr
-                  key={d.id}
-                  className={`border-b border-line/70 last:border-0 hover:bg-forest-soft/30 ${
-                    d.status === "VOID" ? "opacity-60" : ""
-                  }`}
-                >
-                  <td className="px-4 py-3.5 align-middle">{d.paidOnDisplay}</td>
-                  <td className="px-4 py-3.5 align-middle">
-                    <Money paise={d.amountPaise} compact />
-                  </td>
-                  <td className="px-4 py-3.5 align-middle">{d.mode}</td>
-                  <td className="px-4 py-3.5 align-middle">{d.paidTo ?? "—"}</td>
-                  <td className="px-4 py-3.5 align-middle">{d.note ?? "—"}</td>
-                  <td className="px-4 py-3.5 align-middle text-right">
-                    {d.status === "ACTIVE" ? (
-                      <div className="flex justify-end gap-3">
-                        <button
-                          type="button"
-                          onClick={() => setEditingId(d.id)}
-                          className="inline-flex min-h-[44px] items-center px-2 text-xs text-forest underline"
-                        >
-                          Edit
-                        </button>
-                        <VoidButton id={d.id} caseId={d.caseId} action={voidDisbursementAction} />
-                      </div>
-                    ) : (
-                      <span className={VOIDED_BADGE}>Voided</span>
-                    )}
-                  </td>
-                </tr>
-              ),
-            )}
+            {disbursements.map((d) => (
+              <Fragment key={d.id}>
+                {editingId === d.id ? (
+                  <tr className="border-b border-line/70 last:border-0">
+                    <td colSpan={6} className="px-4 py-4">
+                      <DisbursementEditForm
+                        disbursement={toEditable(d)}
+                        onCancel={() => setEditingId(null)}
+                        onSaved={() => setEditingId(null)}
+                      />
+                    </td>
+                  </tr>
+                ) : (
+                  <tr
+                    className={`border-b border-line/70 last:border-0 hover:bg-forest-soft/30 ${
+                      d.status === "VOID" ? "opacity-60" : ""
+                    }`}
+                  >
+                    <td className="px-4 py-3.5 align-middle">{d.paidOnDisplay}</td>
+                    <td className="px-4 py-3.5 align-middle">
+                      <Money paise={d.amountPaise} compact />
+                    </td>
+                    <td className="px-4 py-3.5 align-middle">{d.mode}</td>
+                    <td className="px-4 py-3.5 align-middle">{d.paidTo ?? "—"}</td>
+                    <td className="px-4 py-3.5 align-middle">{d.note ?? "—"}</td>
+                    <td className="px-4 py-3.5 align-middle text-right">
+                      {d.status === "ACTIVE" ? (
+                        <div className="flex justify-end gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setEditingId(d.id)}
+                            className="inline-flex min-h-[44px] items-center px-2 text-xs text-forest underline"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setProofOpenId(proofOpenId === d.id ? null : d.id)}
+                            className="inline-flex min-h-[44px] items-center px-2 text-xs text-forest underline"
+                          >
+                            Proof{d.attachments.length > 0 ? ` (${d.attachments.length})` : ""}
+                          </button>
+                          <VoidButton id={d.id} caseId={d.caseId} action={voidDisbursementAction} />
+                        </div>
+                      ) : (
+                        <span className={VOIDED_BADGE}>Voided</span>
+                      )}
+                    </td>
+                  </tr>
+                )}
+                {proofOpenId === d.id ? (
+                  <tr className="border-b border-line/70 last:border-0 bg-forest-soft/20">
+                    <td colSpan={6} className="px-4 py-4">
+                      <ProofPanel disbursement={d} />
+                    </td>
+                  </tr>
+                ) : null}
+              </Fragment>
+            ))}
           </tbody>
         </table>
       </div>

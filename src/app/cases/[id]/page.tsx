@@ -4,7 +4,7 @@ import { Wordmark } from "@/components/BrandMark";
 import { Money } from "@/components/ui/Money";
 import { categoryLabel } from "@/lib/categories";
 import { caseStatusLabel, caseTypeLabel } from "@/lib/caseMeta";
-import { getPublishedCase } from "@/lib/data/public";
+import { getPublishedCase, listPublicCaseImages } from "@/lib/data/public";
 
 const monthYearFormatter = new Intl.DateTimeFormat("en-IN", {
   month: "long",
@@ -28,6 +28,12 @@ export default async function PublicCasePage({
   const caseItem = await getPublishedCase(id);
   if (!caseItem) notFound();
 
+  // Only reached once getPublishedCase() has already confirmed the case is
+  // published, so listPublicCaseImages' isPublic-only filter is the full
+  // permission check needed here (mirrors isAttachmentPubliclyServable's
+  // rule for a CASE attachment). Never shows a private attachment.
+  const images = await listPublicCaseImages(id);
+
   const location = [caseItem.city, caseItem.state].filter(Boolean).join(", ");
 
   return (
@@ -47,6 +53,21 @@ export default async function PublicCasePage({
         </Link>
 
         <article className="rise rounded-3xl border border-line bg-surface p-7 lift sm:p-10">
+          {images.length > 0 ? (
+            <div className="-mx-7 -mt-7 mb-7 overflow-hidden rounded-t-3xl sm:-mx-10 sm:-mt-10 sm:mb-8">
+              {/*
+                Plain <img>, not next/image: the source is our own
+                /api/files/[id] route (permission-checked per-request), not
+                a static asset Next's build-time optimiser can reason about.
+              */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`/api/files/${images[0].id}`}
+                alt={caseItem.title}
+                className="aspect-video w-full object-cover"
+              />
+            </div>
+          ) : null}
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="inline-flex w-fit items-center rounded-full bg-forest-soft px-3 py-1 text-xs font-semibold uppercase tracking-wide text-forest">
               {categoryLabel(caseItem.category)}

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/authz";
+import { createAttachment, deleteAttachment, getAttachment } from "@/lib/data/attachments";
 import { updateDisbursement, voidDisbursement } from "@/lib/data/cases";
 import { toDateOnly } from "@/lib/fy";
 import { AmountTooLargeError, InvalidAmountError, parseRupeesToPaise } from "@/lib/money";
@@ -99,4 +100,101 @@ export async function editDisbursementAction(
   revalidatePath("/");
   if (caseId) revalidatePath(`/cases/${caseId}`);
   return { ok: true };
+}
+
+const ATTACHMENT_ENTITY_TYPES = ["CASE", "DISBURSEMENT", "CONTRIBUTION"] as const;
+type AttachmentEntityType = (typeof ATTACHMENT_ENTITY_TYPES)[number];
+
+/**
+ * Uploads a file (a cause photo, a transfer-proof screenshot, ...) and
+ * attaches it to a Case/Disbursement/Contribution. requireAdmin() runs
+ * first, before anything else touches the file. Only a CASE attachment may
+ * ever be marked public here -- a DISBURSEMENT/CONTRIBUTION attachment is
+ * forced private regardless of what the form sends, since those always
+ * carry money/bank detail. (The serving route enforces this independently
+ * too, at read time, via isAttachmentPubliclyServable -- this is defence in
+ * depth, not the only guard.)
+ */
+export async function uploadAttachmentAction(
+  _prev: ActionState,
+  data: FormData,
+): Promise<ActionState> {
+  let actor;
+  try {
+    actor = await requireAdmin();
+  } catch {
+    return { error: "You do not have permission to do this." };
+  }
+
+  const entityTypeRaw = String(data.get("entityType") ?? "");
+  const entityType = (ATTACHMENT_ENTITY_TYPES as readonly string[]).includes(entityTypeRaw)
+    ? (entityTypeRaw as AttachmentEntityType)
+    : null;
+  if (!entityType) return { error: "Missing or invalid attachment target." };
+
+  const entityId = String(data.get("entityId") ?? "").trim();
+  if (!entityId) return { error: "Missing attachment target." };
+
+  const fileValue = data.get("file");
+  if (!(fileValue instanceof File) || fileValue.size === 0) {
+    return { error: "Choose a file to upload." };
+  }
+
+  const isPublic = entityType === "CASE" && field(data, "isPublic") === "true";
+
+  let bytes: Buffer;
+  try {
+    bytes = Buffer.from(await fileValue.arrayBuffer());
+  } catch {
+    return { error: "Could not read the uploaded file." };
+  }
+
+  try {
+    await createAttachment({ entityType, entityId, isPublic }, bytes, fileValue.name, actor.id);
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Could not upload the file." };
+  }
+
+  const caseId = field(data, "caseId") ?? (entityType === "CASE" ? entityId : null);
+  if (caseId) {
+    revalidatePath(`/admin/cases/${caseId}`);
+    if (isPublic) {
+      revalidatePath("/");
+      revalidatePath(`/cases/${caseId}`);
+    }
+  }
+
+  return { ok: true };
+}
+
+/**
+ * Deletes an attachment. requireAdmin() first. Looks up whether the
+ * attachment being removed was a public CASE attachment BEFORE deleting it,
+ * so the right public pages get revalidated afterwards.
+ */
+export async function deleteAttachmentAction(data: FormData): Promise<void> {
+  let actor;
+  try {
+    actor = await requireAdmin();
+  } catch {
+    return;
+  }
+
+  const id = String(data.get("id") ?? "").trim();
+  if (!id) return;
+
+  const caseId = field(data, "caseId");
+
+  const before = await getAttachment(id);
+  const wasPublicCase = Boolean(before?.isPublic && before.entityType === "CASE");
+
+  await deleteAttachment(id, actor.id);
+
+  if (caseId) {
+    revalidatePath(`/admin/cases/${caseId}`);
+    if (wasPublicCase) {
+      revalidatePath("/");
+      revalidatePath(`/cases/${caseId}`);
+    }
+  }
 }

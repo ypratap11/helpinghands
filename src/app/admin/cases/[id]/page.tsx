@@ -4,11 +4,14 @@ import { Button } from "@/components/ui/Button";
 import { Money } from "@/components/ui/Money";
 import { CASE_CATEGORIES } from "@/lib/categories";
 import { CASE_STATUSES, CASE_TYPES } from "@/lib/caseMeta";
+import { listAttachments, listAttachmentsForEntities } from "@/lib/data/attachments";
 import { caseDisbursedTotal, getCase } from "@/lib/data/cases";
 import { caseContributionCount, caseRaisedTotal, listCaseContributions } from "@/lib/data/contributions";
 import { todayInIndia } from "@/lib/fy";
 import { CaseForm } from "../CaseForm";
 import { setPublishedAction } from "../actions";
+import { AttachmentGallery, type AttachmentRowData } from "./AttachmentGallery";
+import { AttachmentUploadForm } from "./AttachmentUploadForm";
 import { DisbursementForm } from "./DisbursementForm";
 import { DisbursementList, type DisbursementRowData } from "./DisbursementList";
 
@@ -26,12 +29,18 @@ export default async function EditCasePage({
   if (!caseRecord) notFound();
 
   const today = todayInIndia();
-  const [total, raised, contributionCount, caseContributions] = await Promise.all([
-    caseDisbursedTotal(id),
-    caseRaisedTotal(id),
-    caseContributionCount(id),
-    listCaseContributions(id),
-  ]);
+  const [total, raised, contributionCount, caseContributions, caseAttachments, disbursementAttachments] =
+    await Promise.all([
+      caseDisbursedTotal(id),
+      caseRaisedTotal(id),
+      caseContributionCount(id),
+      listCaseContributions(id),
+      listAttachments("CASE", id),
+      listAttachmentsForEntities(
+        "DISBURSEMENT",
+        caseRecord.disbursements.map((d) => d.id),
+      ),
+    ]);
 
   return (
     <div className="flex flex-col gap-8">
@@ -60,6 +69,28 @@ export default async function EditCasePage({
           today={today}
           caseRecord={caseRecord}
         />
+      </section>
+
+      <section className="rounded-2xl border border-line bg-surface p-6 lift">
+        <h2 className="pb-1 font-display text-lg font-semibold text-ink">Cause photo</h2>
+        <p className="pb-4 text-sm text-muted">
+          A photo or PDF for this cause. Tick &ldquo;Show on the public page&rdquo; to display it once
+          the cause is published — anything left unticked stays admin-only.
+        </p>
+        <div className="flex flex-col gap-4">
+          <AttachmentUploadForm
+            entityType="CASE"
+            entityId={caseRecord.id}
+            caseId={caseRecord.id}
+            allowPublicToggle
+            label="Upload photo"
+          />
+          <AttachmentGallery
+            attachments={caseAttachments.map(toAttachmentRow)}
+            caseId={caseRecord.id}
+            emptyLabel="No photo uploaded for this cause yet."
+          />
+        </div>
       </section>
 
       <section className="rounded-2xl border border-line bg-surface p-6 lift">
@@ -101,22 +132,38 @@ export default async function EditCasePage({
         <DisbursementForm caseId={caseRecord.id} today={today} />
       </section>
 
-      <DisbursementList disbursements={caseRecord.disbursements.map(toDisbursementRow)} />
+      <DisbursementList
+        disbursements={caseRecord.disbursements.map((d) =>
+          toDisbursementRow(d, disbursementAttachments.get(d.id) ?? []),
+        )}
+      />
     </div>
   );
 }
 
-function toDisbursementRow(d: {
+function toAttachmentRow(a: {
   id: string;
-  caseId: string;
-  amountPaise: number;
-  paidOn: Date;
-  mode: string;
-  paidTo: string | null;
-  reference: string | null;
-  note: string | null;
-  status: string;
-}): DisbursementRowData {
+  filename: string;
+  mimeType: string;
+  isPublic: boolean;
+}): AttachmentRowData {
+  return { id: a.id, filename: a.filename, mimeType: a.mimeType, isPublic: a.isPublic };
+}
+
+function toDisbursementRow(
+  d: {
+    id: string;
+    caseId: string;
+    amountPaise: number;
+    paidOn: Date;
+    mode: string;
+    paidTo: string | null;
+    reference: string | null;
+    note: string | null;
+    status: string;
+  },
+  attachments: { id: string; filename: string; mimeType: string; isPublic: boolean }[],
+): DisbursementRowData {
   return {
     id: d.id,
     caseId: d.caseId,
@@ -128,5 +175,6 @@ function toDisbursementRow(d: {
     reference: d.reference,
     note: d.note,
     status: d.status === "VOID" ? "VOID" : "ACTIVE",
+    attachments: attachments.map(toAttachmentRow),
   };
 }
