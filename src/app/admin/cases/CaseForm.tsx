@@ -148,7 +148,35 @@ export function CaseForm({
 
       {!isEdit ? (
         <Field
-          label="Total already given (for a past cause)"
+          label="Total raised so far (for a past cause)"
+          htmlFor="historicalRaised"
+        >
+          <div className="relative">
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted">
+              ₹
+            </span>
+            <input
+              id="historicalRaised"
+              name="historicalRaised"
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              placeholder="0"
+              className={`${inputClass} pl-7`}
+            />
+          </div>
+        </Field>
+      ) : null}
+      {!isEdit ? (
+        <p className="-mt-2 text-xs text-muted">
+          Only fill this in when recording money pooled before this system existed — it records
+          one lump-sum contribution against this cause instead of itemising each past donor.
+        </p>
+      ) : null}
+
+      {!isEdit ? (
+        <Field
+          label="Total already given / disbursed (for a past cause)"
           htmlFor="historicalTotal"
         >
           <div className="relative">
