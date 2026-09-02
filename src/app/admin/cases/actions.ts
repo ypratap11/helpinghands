@@ -10,7 +10,7 @@ import { ANONYMOUS_CONTRIBUTOR_ID } from "@/lib/data/contributors";
 import { toDateOnly } from "@/lib/fy";
 import { AmountTooLargeError, InvalidAmountError, parseRupeesToPaise } from "@/lib/money";
 
-export type ActionState = { error?: string; ok?: boolean };
+export type ActionState = { error?: string; ok?: boolean; redirectTo?: string };
 
 const MODES = ["UPI", "CASH", "BANK", "CHEQUE", "OTHER"] as const;
 type Mode = (typeof MODES)[number];
@@ -134,11 +134,13 @@ export async function saveCaseAction(
     }
   }
 
+  let newCaseId: string | null = null;
   try {
     if (id) {
       await updateCase(id, input, actor.id);
     } else {
       const created = await createCase(input, actor.id);
+      newCaseId = created.id;
       if (historicalRaisedPaise !== null) {
         await createContribution(
           {
@@ -172,7 +174,11 @@ export async function saveCaseAction(
   revalidatePath("/admin/cases");
   if (id) revalidatePath(`/admin/cases/${id}`);
   revalidatePath("/");
-  return { ok: true };
+
+  // After creating a new cause, hand back its page so the form can navigate
+  // there — that's where the admin adds a photo, records disbursements, and
+  // publishes. (Client-side navigation, so the action still returns normally.)
+  return { ok: true, ...(newCaseId ? { redirectTo: `/admin/cases/${newCaseId}` } : {}) };
 }
 
 export async function setPublishedAction(data: FormData): Promise<void> {

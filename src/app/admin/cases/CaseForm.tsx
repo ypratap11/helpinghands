@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Field, inputClass } from "@/components/ui/Field";
 import { todayInIndia } from "@/lib/fy";
@@ -48,15 +49,21 @@ export function CaseForm({
   const formRef = useRef<HTMLFormElement>(null);
   const dateRef = useRef<HTMLInputElement>(null);
   const isEdit = Boolean(caseRecord);
+  const router = useRouter();
 
-  // Clear the form after a successful create so a phone doesn't invite
-  // double-entry. Editing keeps the fields as-is (there's nowhere to
-  // navigate away to and prefilled values should stay visible).
+  // After a successful create, go to the new cause's page — that's where a
+  // photo, disbursements, and Publish live. If there's no destination (edit,
+  // or an older response), just clear the form so a phone doesn't invite
+  // double-entry.
   useEffect(() => {
     if (!state.ok || isEdit) return;
+    if (state.redirectTo) {
+      router.push(state.redirectTo);
+      return;
+    }
     formRef.current?.reset();
     if (dateRef.current) dateRef.current.value = todayInIndia();
-  }, [state, isEdit]);
+  }, [state, isEdit, router]);
 
   return (
     <form ref={formRef} action={formAction} className="flex flex-col gap-4">
