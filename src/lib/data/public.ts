@@ -6,7 +6,7 @@ export type PublicImpact = {
   disbursedPaise: bigint;
   balancePaise: bigint | null;
   peopleHelped: number;
-  contributionCount: number;
+  contributorCount: number;
 };
 
 export type PublicCase = {
@@ -103,14 +103,18 @@ export async function getPublishedCase(id: string): Promise<PublicCase | null> {
 }
 
 export async function publicImpact(): Promise<PublicImpact> {
-  const [collected, disbursed, peopleHelped, contributionCount, settings] = await Promise.all([
+  const [collected, disbursed, peopleHelped, contributorGroups, settings] = await Promise.all([
     prisma.contribution.aggregate({
       where: { status: "ACTIVE" },
       _sum: { amountPaise: true },
     }),
     prisma.disbursement.aggregate({ _sum: { amountPaise: true } }),
     prisma.case.count({ where: { isPublished: true } }),
-    prisma.contribution.count({ where: { status: "ACTIVE" } }),
+    // Distinct people who have given (not the number of contribution records),
+    // so the "Contributors" figure means what it says. A cause backfilled with
+    // a single lump "raised" total counts as one contributor (its donors were
+    // never itemised) — accurate for itemised causes.
+    prisma.contribution.groupBy({ by: ["contributorId"], where: { status: "ACTIVE" } }),
     prisma.orgSettings.findUniqueOrThrow({ where: { id: "singleton" } }),
   ]);
 
@@ -122,6 +126,6 @@ export async function publicImpact(): Promise<PublicImpact> {
     disbursedPaise,
     balancePaise: settings.showBalancePublicly ? raisedPaise - disbursedPaise : null,
     peopleHelped,
-    contributionCount,
+    contributorCount: contributorGroups.length,
   };
 }

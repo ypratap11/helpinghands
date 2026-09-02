@@ -112,32 +112,33 @@ describe("publicImpact", () => {
 
   it("is zero when there are no contributions", async () => {
     const impact = await publicImpact();
-    expect(impact.contributionCount).toBe(0);
+    expect(impact.contributorCount).toBe(0);
   });
 
-  it("counts ACTIVE contributions only, excluding a voided one", async () => {
-    const contributor = await aContributor();
+  it("counts distinct ACTIVE contributors, not contribution records", async () => {
+    const asha = await aContributor("Asha");
+    // Two active contributions from the SAME person count once.
+    for (const amountPaise of [100000, 200000]) {
+      await createContribution(
+        { contributorId: asha.id, amountPaise, receivedOn: new Date(Date.UTC(2026, 7, 28)), mode: "CASH" },
+        null,
+      );
+    }
+    // A different person adds one.
+    const ravi = await aContributor("Ravi");
     await createContribution(
-      {
-        contributorId: contributor.id,
-        amountPaise: 100000,
-        receivedOn: new Date(Date.UTC(2026, 7, 28)),
-        mode: "CASH",
-      },
+      { contributorId: ravi.id, amountPaise: 300000, receivedOn: new Date(Date.UTC(2026, 7, 28)), mode: "CASH" },
       null,
     );
+    // A third person whose only contribution is voided is not counted.
+    const meena = await aContributor("Meena");
     const voided = await createContribution(
-      {
-        contributorId: contributor.id,
-        amountPaise: 500000,
-        receivedOn: new Date(Date.UTC(2026, 7, 28)),
-        mode: "CASH",
-      },
+      { contributorId: meena.id, amountPaise: 500000, receivedOn: new Date(Date.UTC(2026, 7, 28)), mode: "CASH" },
       null,
     );
     await voidContribution(voided.id, null);
 
     const impact = await publicImpact();
-    expect(impact.contributionCount).toBe(1);
+    expect(impact.contributorCount).toBe(2); // Asha + Ravi (distinct); Meena excluded (voided)
   });
 });
