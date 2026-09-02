@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { Wordmark } from "@/components/BrandMark";
-import { CaseCard } from "@/components/CaseCard";
 import { Money } from "@/components/ui/Money";
+import { WhereItWentSection } from "@/components/WhereItWentSection";
 import { listPublishedCases, publicImpact } from "@/lib/data/public";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const [impact, cases] = await Promise.all([publicImpact(), listPublishedCases(6)]);
+  const [impact, cases] = await Promise.all([publicImpact(), listPublishedCases(50)]);
 
   const hasImpact = impact.raisedPaise > 0n || impact.disbursedPaise > 0n || impact.peopleHelped > 0;
 
@@ -104,23 +104,7 @@ export default async function HomePage() {
             ) : null}
           </div>
 
-          {cases.length > 0 ? (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {cases.map((c) => (
-                <CaseCard key={c.id} caseItem={c} />
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-2xl border border-dashed border-line bg-surface/60 p-8 text-center">
-              <h3 className="font-display text-lg font-semibold text-ink">
-                No causes published yet
-              </h3>
-              <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted">
-                When help goes out, an anonymised summary — what it was for, roughly where, and how
-                much — will appear here. Names and details stay private, always.
-              </p>
-            </div>
-          )}
+          <WhereItWentSection cases={cases} />
         </section>
 
         {/* How it works / promise */}

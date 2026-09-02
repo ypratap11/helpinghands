@@ -62,7 +62,10 @@ export default async function PublicCasePage({
               </span>
             ) : null}
           </div>
-          <p className="mt-5 font-display text-2xl font-medium leading-snug text-ink sm:text-3xl">
+          <h1 className="mt-5 font-display text-2xl font-medium leading-snug text-ink sm:text-3xl">
+            {caseItem.title}
+          </h1>
+          <p className="mt-3 max-w-xl text-base leading-relaxed text-muted">
             {caseItem.publicSummary}
           </p>
 

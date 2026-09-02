@@ -47,6 +47,10 @@ describe("listPublishedCases", () => {
     expect(pc.city).toBe("Hyderabad");
     expect(pc.type).toBe("ONCE");
     expect(pc.status).toBe("ACTIVE");
+    // The cause name is admin-authored and now intentionally public, so it
+    // must be present verbatim — distinct from the beneficiaryName marker
+    // below, which must never appear.
+    expect(pc.title).toBe("Hospital bill for a daily-wage worker");
 
     // And CANNOT carry any of these — the whole point of the plan:
     const serialised = JSON.stringify(pc);

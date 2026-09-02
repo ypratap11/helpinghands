@@ -11,6 +11,7 @@ export type PublicImpact = {
 
 export type PublicCase = {
   id: string;
+  title: string;
   category: CaseCategory;
   publicSummary: string;
   city: string | null;
@@ -24,11 +25,14 @@ export type PublicCase = {
 /**
  * The public fields of a Case — anonymised by construction. Every read in
  * this module selects exactly this shape and NEVER `include`s or selects
- * beneficiaryName, beneficiaryContact, or privateNotes. `type` and `status`
- * ARE safe to expose publicly (they carry no beneficiary information).
+ * beneficiaryName, beneficiaryContact, or privateNotes. `type`, `status`,
+ * and `title` ARE safe to expose publicly (they carry no beneficiary
+ * information — `title` is the admin-authored cause name, not a person's
+ * name).
  */
 const PUBLIC_CASE_SELECT = {
   id: true,
+  title: true,
   category: true,
   publicSummary: true,
   city: true,
@@ -40,6 +44,7 @@ const PUBLIC_CASE_SELECT = {
 
 type PublicCaseRow = {
   id: string;
+  title: string;
   category: CaseCategory;
   publicSummary: string;
   city: string | null;
@@ -62,6 +67,7 @@ async function disbursedTotalsFor(caseIds: string[]): Promise<Map<string, bigint
 function toPublicCase(row: PublicCaseRow, disbursedPaise: bigint): PublicCase {
   return {
     id: row.id,
+    title: row.title,
     category: row.category,
     publicSummary: row.publicSummary,
     city: row.city,
