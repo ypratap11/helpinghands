@@ -6,11 +6,12 @@ export type PublicImpact = {
   disbursedPaise: bigint;
   balancePaise: bigint | null;
   peopleHelped: number;
-  contributionCount: number;
+  contributorCount: number;
 };
 
 export type PublicCase = {
   id: string;
+  title: string;
   category: CaseCategory;
   publicSummary: string;
   city: string | null;
@@ -24,11 +25,14 @@ export type PublicCase = {
 /**
  * The public fields of a Case — anonymised by construction. Every read in
  * this module selects exactly this shape and NEVER `include`s or selects
- * beneficiaryName, beneficiaryContact, or privateNotes. `type` and `status`
- * ARE safe to expose publicly (they carry no beneficiary information).
+ * beneficiaryName, beneficiaryContact, or privateNotes. `type`, `status`,
+ * and `title` ARE safe to expose publicly (they carry no beneficiary
+ * information — `title` is the admin-authored cause name, not a person's
+ * name).
  */
 const PUBLIC_CASE_SELECT = {
   id: true,
+  title: true,
   category: true,
   publicSummary: true,
   city: true,
@@ -40,6 +44,7 @@ const PUBLIC_CASE_SELECT = {
 
 type PublicCaseRow = {
   id: string;
+  title: string;
   category: CaseCategory;
   publicSummary: string;
   city: string | null;
@@ -62,6 +67,7 @@ async function disbursedTotalsFor(caseIds: string[]): Promise<Map<string, bigint
 function toPublicCase(row: PublicCaseRow, disbursedPaise: bigint): PublicCase {
   return {
     id: row.id,
+    title: row.title,
     category: row.category,
     publicSummary: row.publicSummary,
     city: row.city,
@@ -97,14 +103,18 @@ export async function getPublishedCase(id: string): Promise<PublicCase | null> {
 }
 
 export async function publicImpact(): Promise<PublicImpact> {
-  const [collected, disbursed, peopleHelped, contributionCount, settings] = await Promise.all([
+  const [collected, disbursed, peopleHelped, contributorGroups, settings] = await Promise.all([
     prisma.contribution.aggregate({
       where: { status: "ACTIVE" },
       _sum: { amountPaise: true },
     }),
     prisma.disbursement.aggregate({ _sum: { amountPaise: true } }),
     prisma.case.count({ where: { isPublished: true } }),
-    prisma.contribution.count({ where: { status: "ACTIVE" } }),
+    // Distinct people who have given (not the number of contribution records),
+    // so the "Contributors" figure means what it says. A cause backfilled with
+    // a single lump "raised" total counts as one contributor (its donors were
+    // never itemised) — accurate for itemised causes.
+    prisma.contribution.groupBy({ by: ["contributorId"], where: { status: "ACTIVE" } }),
     prisma.orgSettings.findUniqueOrThrow({ where: { id: "singleton" } }),
   ]);
 
@@ -116,6 +126,6 @@ export async function publicImpact(): Promise<PublicImpact> {
     disbursedPaise,
     balancePaise: settings.showBalancePublicly ? raisedPaise - disbursedPaise : null,
     peopleHelped,
-    contributionCount,
+    contributorCount: contributorGroups.length,
   };
 }

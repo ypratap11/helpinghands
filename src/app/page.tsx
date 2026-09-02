@@ -1,13 +1,19 @@
 import Link from "next/link";
 import { Wordmark } from "@/components/BrandMark";
-import { CaseCard } from "@/components/CaseCard";
 import { Money } from "@/components/ui/Money";
+import { WhereItWentSection } from "@/components/WhereItWentSection";
+import { auth } from "@/lib/auth";
 import { listPublishedCases, publicImpact } from "@/lib/data/public";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const [impact, cases] = await Promise.all([publicImpact(), listPublishedCases(6)]);
+  const [impact, cases, session] = await Promise.all([
+    publicImpact(),
+    listPublishedCases(50),
+    auth(),
+  ]);
+  const loggedIn = Boolean(session?.user);
 
   const hasImpact = impact.raisedPaise > 0n || impact.disbursedPaise > 0n || impact.peopleHelped > 0;
 
@@ -19,8 +25,8 @@ export default async function HomePage() {
       node: <span className="nums">{impact.peopleHelped.toLocaleString("en-IN")}</span>,
     },
     {
-      label: "Contributions",
-      node: <span className="nums">{impact.contributionCount.toLocaleString("en-IN")}</span>,
+      label: "Contributors",
+      node: <span className="nums">{impact.contributorCount.toLocaleString("en-IN")}</span>,
     },
   ];
   if (impact.balancePaise !== null) {
@@ -32,10 +38,10 @@ export default async function HomePage() {
       <header className="mx-auto flex w-full max-w-5xl items-center justify-between px-6 py-6">
         <Wordmark />
         <Link
-          href="/login"
+          href={loggedIn ? "/home" : "/login"}
           className="inline-flex min-h-[40px] items-center rounded-xl border border-line bg-surface/70 px-4 text-sm font-semibold text-forest transition-colors hover:bg-forest-soft"
         >
-          Sign in
+          {loggedIn ? "Go to your account" : "Sign in"}
         </Link>
       </header>
 
@@ -56,13 +62,15 @@ export default async function HomePage() {
           </p>
           <div className="rise mt-9 flex flex-col gap-3 sm:flex-row" style={{ animationDelay: "220ms" }}>
             <Link
-              href="/login"
+              href={loggedIn ? "/home" : "/login"}
               className="inline-flex min-h-[48px] items-center justify-center rounded-xl bg-forest px-6 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-forest-dark"
             >
-              Sign in to continue
+              {loggedIn ? "Go to your account" : "Sign in to continue"}
             </Link>
             <span className="inline-flex min-h-[48px] items-center text-sm text-muted">
-              Members see their giving. Admins keep the ledger.
+              {loggedIn
+                ? "You're signed in."
+                : "Members see their giving. Admins keep the ledger."}
             </span>
           </div>
         </section>
@@ -104,23 +112,7 @@ export default async function HomePage() {
             ) : null}
           </div>
 
-          {cases.length > 0 ? (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {cases.map((c) => (
-                <CaseCard key={c.id} caseItem={c} />
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-2xl border border-dashed border-line bg-surface/60 p-8 text-center">
-              <h3 className="font-display text-lg font-semibold text-ink">
-                No causes published yet
-              </h3>
-              <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted">
-                When help goes out, an anonymised summary — what it was for, roughly where, and how
-                much — will appear here. Names and details stay private, always.
-              </p>
-            </div>
-          )}
+          <WhereItWentSection cases={cases} />
         </section>
 
         {/* How it works / promise */}
