@@ -12,6 +12,9 @@ const { ForbiddenError } = await import("@/lib/authz");
 const { saveCaseAction, addDisbursementAction, setPublishedAction } = await import(
   "@/app/admin/cases/actions"
 );
+const { voidDisbursementAction, editDisbursementAction } = await import(
+  "@/app/admin/cases/[id]/actions"
+);
 
 function form(fields: Record<string, string>) {
   const data = new FormData();
@@ -485,5 +488,177 @@ describe("setPublishedAction", () => {
 
     const after = await prisma.case.findUnique({ where: { id: created.id } });
     expect(after?.isPublished).toBe(false);
+  });
+});
+
+describe("voidDisbursementAction", () => {
+  beforeEach(async () => {
+    requireAdminMock.mockReset();
+    requireAdminMock.mockResolvedValue({ id: "admin1", email: "boss@example.com", role: "ADMIN" });
+    await prisma.user.create({ data: { id: "admin1", email: "boss@example.com", role: "ADMIN" } });
+  });
+
+  async function aDisbursement() {
+    const caseRecord = await prisma.case.create({
+      data: {
+        title: "A case",
+        category: "MEDICAL",
+        publicSummary: "Summary.",
+        occurredOn: new Date(Date.UTC(2026, 5, 10)),
+      },
+    });
+    return prisma.disbursement.create({
+      data: {
+        caseId: caseRecord.id,
+        amountPaise: 100000,
+        paidOn: new Date(Date.UTC(2026, 5, 15)),
+        mode: "BANK",
+      },
+    });
+  }
+
+  it("voids the disbursement for an admin", async () => {
+    const disbursement = await aDisbursement();
+
+    await voidDisbursementAction(form({ id: disbursement.id }));
+
+    const after = await prisma.disbursement.findUnique({ where: { id: disbursement.id } });
+    expect(after?.status).toBe("VOID");
+  });
+
+  it("returns cleanly for a non-admin instead of throwing, and voids nothing", async () => {
+    requireAdminMock.mockRejectedValue(new ForbiddenError());
+    const disbursement = await aDisbursement();
+
+    await expect(voidDisbursementAction(form({ id: disbursement.id }))).resolves.toBeUndefined();
+
+    const after = await prisma.disbursement.findUnique({ where: { id: disbursement.id } });
+    expect(after?.status).toBe("ACTIVE");
+  });
+});
+
+describe("editDisbursementAction", () => {
+  beforeEach(async () => {
+    requireAdminMock.mockReset();
+    requireAdminMock.mockResolvedValue({ id: "admin1", email: "boss@example.com", role: "ADMIN" });
+    await prisma.user.create({ data: { id: "admin1", email: "boss@example.com", role: "ADMIN" } });
+  });
+
+  async function aDisbursement() {
+    const caseRecord = await prisma.case.create({
+      data: {
+        title: "A case",
+        category: "MEDICAL",
+        publicSummary: "Summary.",
+        occurredOn: new Date(Date.UTC(2026, 5, 10)),
+      },
+    });
+    return prisma.disbursement.create({
+      data: {
+        caseId: caseRecord.id,
+        amountPaise: 100000,
+        paidOn: new Date(Date.UTC(2026, 5, 15)),
+        mode: "BANK",
+        paidTo: "Apollo Hospital",
+      },
+    });
+  }
+
+  it("converts the typed rupee amount to paise and updates for an admin", async () => {
+    const disbursement = await aDisbursement();
+
+    const result = await editDisbursementAction(
+      {},
+      form({
+        id: disbursement.id,
+        caseId: disbursement.caseId,
+        amount: "1,500.50",
+        paidOn: "2026-08-28",
+        mode: "UPI",
+        paidTo: "Care Hospital",
+      }),
+    );
+
+    expect(result.ok).toBe(true);
+    const after = await prisma.disbursement.findUnique({ where: { id: disbursement.id } });
+    expect(after?.amountPaise).toBe(150050);
+    expect(after?.mode).toBe("UPI");
+    expect(after?.paidTo).toBe("Care Hospital");
+  });
+
+  it("refuses a non-admin and writes nothing", async () => {
+    requireAdminMock.mockRejectedValue(new ForbiddenError());
+    const disbursement = await aDisbursement();
+
+    const result = await editDisbursementAction(
+      {},
+      form({
+        id: disbursement.id,
+        caseId: disbursement.caseId,
+        amount: "999",
+        paidOn: "2026-08-28",
+        mode: "CASH",
+      }),
+    );
+
+    expect(result.error).toBeTruthy();
+    const after = await prisma.disbursement.findUnique({ where: { id: disbursement.id } });
+    expect(after?.amountPaise).toBe(100000); // untouched
+  });
+
+  it("rejects a date whose components roll over into a different day, and writes nothing", async () => {
+    const disbursement = await aDisbursement();
+
+    const result = await editDisbursementAction(
+      {},
+      form({
+        id: disbursement.id,
+        caseId: disbursement.caseId,
+        amount: "999",
+        paidOn: "2026-13-40",
+        mode: "CASH",
+      }),
+    );
+
+    expect(result.error).toMatch(/date/i);
+    const after = await prisma.disbursement.findUnique({ where: { id: disbursement.id } });
+    expect(after?.amountPaise).toBe(100000); // untouched
+  });
+
+  it("returns a friendly error for an amount above the postgres INT4 ceiling and writes nothing", async () => {
+    const disbursement = await aDisbursement();
+
+    const result = await editDisbursementAction(
+      {},
+      form({
+        id: disbursement.id,
+        caseId: disbursement.caseId,
+        amount: "21474836.48",
+        paidOn: "2026-08-28",
+        mode: "CASH",
+      }),
+    );
+
+    expect(result.error).toBeTruthy();
+    const after = await prisma.disbursement.findUnique({ where: { id: disbursement.id } });
+    expect(after?.amountPaise).toBe(100000); // untouched
+  });
+
+  it("refuses to edit a VOID disbursement", async () => {
+    const disbursement = await aDisbursement();
+    await voidDisbursementAction(form({ id: disbursement.id }));
+
+    const result = await editDisbursementAction(
+      {},
+      form({
+        id: disbursement.id,
+        caseId: disbursement.caseId,
+        amount: "999",
+        paidOn: "2026-08-28",
+        mode: "CASH",
+      }),
+    );
+
+    expect(result.error).toBeTruthy();
   });
 });

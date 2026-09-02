@@ -10,6 +10,7 @@ import { todayInIndia } from "@/lib/fy";
 import { CaseForm } from "../CaseForm";
 import { setPublishedAction } from "../actions";
 import { DisbursementForm } from "./DisbursementForm";
+import { DisbursementList, type DisbursementRowData } from "./DisbursementList";
 
 function formatDate(value: Date) {
   return value.toISOString().slice(0, 10).split("-").reverse().join("/");
@@ -100,29 +101,32 @@ export default async function EditCasePage({
         <DisbursementForm caseId={caseRecord.id} today={today} />
       </section>
 
-      <RecordList
-        items={caseRecord.disbursements}
-        empty="No disbursements recorded yet."
-        columns={[
-          { key: "date", header: "Date", cell: (d) => formatDate(d.paidOn) },
-          { key: "amount", header: "Amount", cell: (d) => <Money paise={d.amountPaise} compact /> },
-          { key: "mode", header: "Mode", cell: (d) => d.mode },
-          { key: "paidTo", header: "Paid to", cell: (d) => d.paidTo ?? "—" },
-          { key: "note", header: "Note", cell: (d) => d.note ?? "—" },
-        ]}
-        renderCard={(d) => (
-          <div className="flex flex-col gap-1">
-            <div className="flex items-baseline justify-between">
-              <span className="font-medium">{d.paidTo ?? "—"}</span>
-              <Money paise={d.amountPaise} compact />
-            </div>
-            <span className="text-sm text-muted">
-              {formatDate(d.paidOn)} · {d.mode}
-            </span>
-            {d.note ? <span className="text-xs text-muted">{d.note}</span> : null}
-          </div>
-        )}
-      />
+      <DisbursementList disbursements={caseRecord.disbursements.map(toDisbursementRow)} />
     </div>
   );
+}
+
+function toDisbursementRow(d: {
+  id: string;
+  caseId: string;
+  amountPaise: number;
+  paidOn: Date;
+  mode: string;
+  paidTo: string | null;
+  reference: string | null;
+  note: string | null;
+  status: string;
+}): DisbursementRowData {
+  return {
+    id: d.id,
+    caseId: d.caseId,
+    amountPaise: d.amountPaise,
+    paidOn: d.paidOn.toISOString().slice(0, 10),
+    paidOnDisplay: formatDate(d.paidOn),
+    mode: d.mode,
+    paidTo: d.paidTo,
+    reference: d.reference,
+    note: d.note,
+    status: d.status === "VOID" ? "VOID" : "ACTIVE",
+  };
 }

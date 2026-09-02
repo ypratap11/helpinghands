@@ -33,6 +33,7 @@ export const disbursementSchema = z.object({
 });
 
 export type DisbursementInput = z.infer<typeof disbursementSchema>;
+export type DisbursementUpdateInput = Partial<DisbursementInput>;
 
 function normalise(input: CaseInput) {
   const parsed = caseSchema.parse(input);
@@ -138,6 +139,7 @@ export async function listCases() {
   const cases = await prisma.case.findMany({ orderBy: { createdAt: "desc" } });
   const totals = await prisma.disbursement.groupBy({
     by: ["caseId"],
+    where: { status: "ACTIVE" },
     _sum: { amountPaise: true },
   });
   const totalsByCase = new Map(totals.map((t) => [t.caseId, BigInt(t._sum.amountPaise ?? 0)]));
@@ -191,8 +193,76 @@ export async function createDisbursement(
 
 export async function caseDisbursedTotal(caseId: string): Promise<bigint> {
   const result = await prisma.disbursement.aggregate({
-    where: { caseId },
+    where: { caseId, status: "ACTIVE" },
     _sum: { amountPaise: true },
   });
   return BigInt(result._sum.amountPaise ?? 0);
+}
+
+export async function voidDisbursement(id: string, actorId: string | null): Promise<void> {
+  const before = await prisma.disbursement.findUnique({ where: { id } });
+  if (!before) throw new Error("Disbursement not found");
+  if (before.status === "VOID") return;
+
+  await prisma.$transaction(async (tx) => {
+    await tx.disbursement.update({ where: { id }, data: { status: "VOID" } });
+    await recordAudit({
+      userId: actorId,
+      action: "VOID",
+      entityType: "Disbursement",
+      entityId: id,
+      before: { status: before.status, amountPaise: before.amountPaise },
+      after: { status: "VOID" },
+      tx,
+    });
+  });
+}
+
+/**
+ * Builds an update payload containing only the keys actually present on
+ * `input`, mirroring normalisePartial() above — an omitted key leaves the
+ * existing column value untouched rather than nulling it.
+ */
+function normalisePartialDisbursement(input: DisbursementUpdateInput) {
+  const parsed = disbursementSchema.partial().parse(input);
+  const data: Record<string, unknown> = {};
+  for (const key of Object.keys(input) as (keyof DisbursementInput)[]) {
+    if (key === "paidOn") {
+      data.paidOn = parsed.paidOn ? toDateOnly(parsed.paidOn) : parsed.paidOn;
+    } else if (key === "paidTo" || key === "reference" || key === "note") {
+      data[key] = parsed[key] || null;
+    } else {
+      data[key] = parsed[key];
+    }
+  }
+  return data;
+}
+
+export async function updateDisbursement(
+  id: string,
+  input: DisbursementUpdateInput,
+  actorId: string | null,
+) {
+  const before = await prisma.disbursement.findUnique({ where: { id } });
+  if (!before) throw new Error("Disbursement not found");
+  if (before.status === "VOID") throw new Error("A voided disbursement cannot be edited");
+
+  const data = normalisePartialDisbursement(input);
+  const updated = await prisma.disbursement.update({ where: { id }, data });
+
+  await recordAudit({
+    userId: actorId,
+    action: "UPDATE",
+    entityType: "Disbursement",
+    entityId: id,
+    before: {
+      amountPaise: before.amountPaise,
+      paidOn: before.paidOn,
+      mode: before.mode,
+      paidTo: before.paidTo,
+    },
+    after: data,
+  });
+
+  return updated;
 }

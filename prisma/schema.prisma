@@ -24,6 +24,11 @@ enum ContributionStatus {
   VOID
 }
 
+enum DisbursementStatus {
+  ACTIVE
+  VOID
+}
+
 enum CaseCategory {
   MEDICAL
   EDUCATION
@@ -180,16 +185,17 @@ model Case {
 }
 
 model Disbursement {
-  id               String      @id @default(cuid())
+  id               String             @id @default(cuid())
   caseId           String
   amountPaise      Int
-  paidOn           DateTime    @db.Date
+  paidOn           DateTime           @db.Date
   mode             PaymentMode
   paidTo           String?
   reference        String?
   note             String?
+  status           DisbursementStatus @default(ACTIVE)
   recordedByUserId String?
-  createdAt        DateTime    @default(now())
+  createdAt        DateTime           @default(now())
 
   case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
 

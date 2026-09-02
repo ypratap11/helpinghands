@@ -8,6 +8,8 @@ import {
   listCases,
   setCasePublished,
   updateCase,
+  updateDisbursement,
+  voidDisbursement,
 } from "@/lib/data/cases";
 
 async function aCase(overrides: Record<string, unknown> = {}) {
@@ -270,6 +272,147 @@ describe("listCases", () => {
     const secondResult = list.find((c) => c.id === second.id);
     expect(firstResult?.disbursedPaise).toBe(75000n);
     expect(secondResult?.disbursedPaise).toBe(0n);
+  });
+});
+
+describe("voidDisbursement", () => {
+  it("marks the row VOID instead of deleting it, and writes an audit entry", async () => {
+    const actor = await prisma.user.create({ data: { email: "boss@example.com" } });
+    const created = await aCase();
+    const disbursement = await createDisbursement(
+      created.id,
+      { amountPaise: 100000, paidOn: new Date(Date.UTC(2026, 5, 15)), mode: "BANK", paidTo: "Apollo Hospital" },
+      actor.id,
+    );
+
+    await voidDisbursement(disbursement.id, actor.id);
+
+    const after = await prisma.disbursement.findUnique({ where: { id: disbursement.id } });
+    expect(after).not.toBeNull();
+    expect(after?.status).toBe("VOID");
+    expect(after?.paidTo).toBe("Apollo Hospital"); // untouched, not deleted
+
+    const audit = await prisma.auditLog.findFirst({
+      where: { entityType: "Disbursement", entityId: disbursement.id, action: "VOID" },
+    });
+    expect(audit).not.toBeNull();
+    expect(audit?.userId).toBe(actor.id);
+  });
+
+  it("is idempotent: voiding an already-voided disbursement is a no-op", async () => {
+    const created = await aCase();
+    const disbursement = await createDisbursement(
+      created.id,
+      { amountPaise: 100000, paidOn: new Date(Date.UTC(2026, 5, 15)), mode: "BANK" },
+      null,
+    );
+
+    await voidDisbursement(disbursement.id, null);
+    await voidDisbursement(disbursement.id, null);
+
+    const voidAudits = await prisma.auditLog.count({
+      where: { entityType: "Disbursement", entityId: disbursement.id, action: "VOID" },
+    });
+    expect(voidAudits).toBe(1);
+  });
+
+  it("throws for an unknown disbursement", async () => {
+    await expect(voidDisbursement("does-not-exist", null)).rejects.toThrow();
+  });
+
+  it("excludes the voided disbursement from caseDisbursedTotal", async () => {
+    const created = await aCase();
+    const keep = await createDisbursement(
+      created.id,
+      { amountPaise: 100000, paidOn: new Date(Date.UTC(2026, 5, 15)), mode: "BANK" },
+      null,
+    );
+    const drop = await createDisbursement(
+      created.id,
+      { amountPaise: 500000, paidOn: new Date(Date.UTC(2026, 5, 15)), mode: "CASH" },
+      null,
+    );
+    expect(await caseDisbursedTotal(created.id)).toBe(600000n);
+
+    await voidDisbursement(drop.id, null);
+
+    expect(await caseDisbursedTotal(created.id)).toBe(100000n);
+    expect(keep.amountPaise).toBe(100000);
+  });
+
+  it("excludes the voided disbursement from listCases' per-case total", async () => {
+    const created = await aCase();
+    const disbursement = await createDisbursement(
+      created.id,
+      { amountPaise: 75000, paidOn: new Date(Date.UTC(2026, 5, 15)), mode: "BANK" },
+      null,
+    );
+
+    await voidDisbursement(disbursement.id, null);
+
+    const list = await listCases();
+    const found = list.find((c) => c.id === created.id);
+    expect(found?.disbursedPaise).toBe(0n);
+  });
+});
+
+describe("updateDisbursement", () => {
+  it("changes fields non-destructively and writes an audit entry", async () => {
+    const actor = await prisma.user.create({ data: { email: "boss@example.com" } });
+    const created = await aCase();
+    const disbursement = await createDisbursement(
+      created.id,
+      { amountPaise: 100000, paidOn: new Date(Date.UTC(2026, 5, 15)), mode: "BANK", paidTo: "Apollo Hospital" },
+      actor.id,
+    );
+
+    const updated = await updateDisbursement(
+      disbursement.id,
+      { amountPaise: 150000, paidTo: "Care Hospital" },
+      actor.id,
+    );
+
+    expect(updated.amountPaise).toBe(150000);
+    expect(updated.paidTo).toBe("Care Hospital");
+    expect(updated.mode).toBe("BANK"); // left untouched
+
+    const audit = await prisma.auditLog.findFirst({
+      where: { entityType: "Disbursement", entityId: disbursement.id, action: "UPDATE" },
+    });
+    expect(audit).not.toBeNull();
+    expect((audit?.before as { amountPaise: number }).amountPaise).toBe(100000);
+    expect((audit?.after as { amountPaise: number }).amountPaise).toBe(150000);
+  });
+
+  it("leaves a field untouched when the update omits it", async () => {
+    const created = await aCase();
+    const disbursement = await createDisbursement(
+      created.id,
+      { amountPaise: 100000, paidOn: new Date(Date.UTC(2026, 5, 15)), mode: "BANK", note: "Original note" },
+      null,
+    );
+
+    await updateDisbursement(disbursement.id, { amountPaise: 200000 }, null);
+
+    const after = await prisma.disbursement.findUnique({ where: { id: disbursement.id } });
+    expect(after?.amountPaise).toBe(200000);
+    expect(after?.note).toBe("Original note");
+  });
+
+  it("refuses to edit a VOID disbursement", async () => {
+    const created = await aCase();
+    const disbursement = await createDisbursement(
+      created.id,
+      { amountPaise: 100000, paidOn: new Date(Date.UTC(2026, 5, 15)), mode: "BANK" },
+      null,
+    );
+    await voidDisbursement(disbursement.id, null);
+
+    await expect(updateDisbursement(disbursement.id, { amountPaise: 999 }, null)).rejects.toThrow();
+  });
+
+  it("throws for an unknown disbursement", async () => {
+    await expect(updateDisbursement("does-not-exist", { amountPaise: 999 }, null)).rejects.toThrow();
   });
 });
 
