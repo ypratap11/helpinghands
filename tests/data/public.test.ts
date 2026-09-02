@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { prisma } from "@/lib/db";
 import { createCase, createDisbursement, setCasePublished } from "@/lib/data/cases";
+import { createContribution, voidContribution } from "@/lib/data/contributions";
+import { createContributor } from "@/lib/data/contributors";
 import { getPublishedCase, listPublishedCases, publicImpact } from "@/lib/data/public";
+
+async function aContributor(name = "Asha") {
+  return createContributor({ name, email: null }, null);
+}
 
 async function aCase(overrides: Record<string, unknown> = {}) {
   return createCase(
@@ -98,5 +104,36 @@ describe("publicImpact", () => {
     });
     const impact = await publicImpact();
     expect(impact.balancePaise).not.toBeNull();
+  });
+
+  it("is zero when there are no contributions", async () => {
+    const impact = await publicImpact();
+    expect(impact.contributionCount).toBe(0);
+  });
+
+  it("counts ACTIVE contributions only, excluding a voided one", async () => {
+    const contributor = await aContributor();
+    await createContribution(
+      {
+        contributorId: contributor.id,
+        amountPaise: 100000,
+        receivedOn: new Date(Date.UTC(2026, 7, 28)),
+        mode: "CASH",
+      },
+      null,
+    );
+    const voided = await createContribution(
+      {
+        contributorId: contributor.id,
+        amountPaise: 500000,
+        receivedOn: new Date(Date.UTC(2026, 7, 28)),
+        mode: "CASH",
+      },
+      null,
+    );
+    await voidContribution(voided.id, null);
+
+    const impact = await publicImpact();
+    expect(impact.contributionCount).toBe(1);
   });
 });

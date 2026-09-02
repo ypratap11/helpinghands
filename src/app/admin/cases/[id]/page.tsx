@@ -5,7 +5,7 @@ import { Money } from "@/components/ui/Money";
 import { CASE_CATEGORIES } from "@/lib/categories";
 import { CASE_STATUSES, CASE_TYPES } from "@/lib/caseMeta";
 import { caseDisbursedTotal, getCase } from "@/lib/data/cases";
-import { caseRaisedTotal, listCaseContributions } from "@/lib/data/contributions";
+import { caseContributionCount, caseRaisedTotal, listCaseContributions } from "@/lib/data/contributions";
 import { todayInIndia } from "@/lib/fy";
 import { CaseForm } from "../CaseForm";
 import { setPublishedAction } from "../actions";
@@ -25,9 +25,10 @@ export default async function EditCasePage({
   if (!caseRecord) notFound();
 
   const today = todayInIndia();
-  const [total, raised, caseContributions] = await Promise.all([
+  const [total, raised, contributionCount, caseContributions] = await Promise.all([
     caseDisbursedTotal(id),
     caseRaisedTotal(id),
+    caseContributionCount(id),
     listCaseContributions(id),
   ]);
 
@@ -64,7 +65,9 @@ export default async function EditCasePage({
         <div className="flex items-baseline justify-between pb-4">
           <h2 className="font-display text-lg font-semibold text-ink">Raised for this cause</h2>
           <span className="text-sm text-muted">
-            <Money paise={raised} compact className="font-semibold text-forest" />
+            <Money paise={raised} compact className="font-semibold text-forest" /> ·{" "}
+            {contributionCount.toLocaleString("en-IN")}{" "}
+            {contributionCount === 1 ? "contribution" : "contributions"}
           </span>
         </div>
         <RecordList

@@ -144,6 +144,10 @@ export async function caseRaisedTotal(caseId: string): Promise<bigint> {
   return BigInt(result._sum.amountPaise ?? 0);
 }
 
+export async function caseContributionCount(caseId: string): Promise<number> {
+  return prisma.contribution.count({ where: { caseId, status: "ACTIVE" } });
+}
+
 export async function listCaseContributions(caseId: string) {
   return prisma.contribution.findMany({
     where: { caseId, status: "ACTIVE" },
