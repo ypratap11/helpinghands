@@ -1,3 +1,9 @@
 helpinghands.augaster.com {
 	reverse_proxy app:3000
 }
+
+# OpenClaw phone/SMS agents share this droplet (container openclaw-agents on helpinghands_default).
+# Source: github.com/ypratap11/phoneagent. DNS: Cloudflare A record, proxy OFF.
+agents.augaster.com {
+	reverse_proxy openclaw-agents:3000
+}
